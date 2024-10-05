@@ -1,0 +1,20 @@
+{
+  "name": "scms-api",
+  "version": "1.0.0",
+  "description": "BackendAPI for Supply chain management sysytem",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dpiyumal2319/SCMS-API.git"
+  },
+  "author": "Dasun Piyumal",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dpiyumal2319/SCMS-API/issues"
+  },
+  "homepage": "https://github.com/dpiyumal2319/SCMS-API#readme"
+}
