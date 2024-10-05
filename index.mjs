@@ -1,6 +1,9 @@
 import express from "express";
 import mysql from "mysql2";
 import cors from "cors";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

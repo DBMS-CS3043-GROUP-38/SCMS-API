@@ -2,10 +2,10 @@
   "name": "scms-api",
   "version": "1.0.0",
   "description": "BackendAPI for Supply chain management sysytem",
-  "main": "index.js",
+  "main": "index.mjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node index.mjs"
   },
   "repository": {
     "type": "git",
