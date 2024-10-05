@@ -1,4 +1,4 @@
-import connection from '../database/db.js';
+import pool from '../database/db.mjs';
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -7,7 +7,7 @@ dotenv.config();
 async function createStore(city) {
     try {
         const query = `INSERT INTO store (City) VALUES (?)`;
-        await connection.promise().query(query, [city]);
+        await pool.query(query, [city]);
         console.log(`Store in ${city} created successfully`);
     } catch (error) {
         console.log(error);
@@ -15,8 +15,6 @@ async function createStore(city) {
 }
 
 async function storeCreation(cities) {
-    // Drop all data in store table
-    await connection.promise().query('DELETE FROM store');
 
     for (const city of cities) {
         await createStore(city);

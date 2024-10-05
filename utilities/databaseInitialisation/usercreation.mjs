@@ -1,4 +1,4 @@
-import connection from '../database/db.js';
+import pool from '../database/db.mjs';
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import {faker} from "@faker-js/faker";
@@ -13,16 +13,16 @@ async function createEmployee(data) {
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
         const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID) VALUES (?, ?, ?, ?, ?, ?)`;
-        const [result] = await connection.promise().query(query, [name, username, address, hashedPassword, type, StoreID]);
+        const [result] = await pool.query(query, [name, username, address, hashedPassword, type, StoreID]);
 
         const id = result.insertId;
 
         if (type === 'Driver') {
             const driverQuery = `INSERT INTO Driver (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, 40, 0, 'Available')`;
-            await connection.promise().query(driverQuery, [id]);
+            await pool.query(driverQuery, [id]);
         } else if (type === 'Assistant') {
             const assistantQuery = `INSERT INTO Assistant (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, 60, 0, 'Available')`;
-            await connection.promise().query(assistantQuery, [id]);
+            await pool.query(assistantQuery, [id]);
         }
         console.log(`Employee ${name} created successfully: username - ${username}, type - ${type}`);
     } catch (error) {
@@ -36,7 +36,7 @@ async function createCustomer(data) {
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
         const query = `INSERT INTO customer (Username, Name, Address, Type, City, PasswordHash) VALUES (?, ?, ?, ?, ?, ?)`;
-        await connection.promise().query(query, [username, name, address, type, city, hashedPassword]);
+        await pool.query(query, [username, name, address, type, city, hashedPassword]);
         console.log(`Customer ${name} created successfully: username - ${username}, city - ${city}`);
     } catch (error) {
         console.log(error);
@@ -44,12 +44,6 @@ async function createCustomer(data) {
 }
 
 async function userCreation(cities) {
-    //Drop all data in employee and customer tables
-    await connection.promise().query('DELETE FROM Assistant');
-    await connection.promise().query('DELETE FROM Driver');
-    await connection.promise().query('DELETE FROM employee');
-    await connection.promise().query('DELETE FROM customer');
-
     //Generate 5 Admins
     for (let i = 0; i < 5; i++) {
         const fullName = faker.person.fullName();

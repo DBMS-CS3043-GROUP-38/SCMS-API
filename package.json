@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.mjs",
-    "create-users": "node .\\utilities\\databaseinitialisation\\createUsers.mjs"
+    "initialise-database": "node utilities/databaseInitialisation/index.mjs",
+    "reset-db": "node utilities/database/run-ddl.mjs"
   },
   "repository": {
     "type": "git",

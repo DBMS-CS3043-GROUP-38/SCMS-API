@@ -1,4 +1,4 @@
-import connection from '../database/db.mjs';
+import pool from '../database/db.mjs';
 
 // Function to generate a random day
 function getRandomDay() {
@@ -28,7 +28,7 @@ async function createRandomTrain(storeID) {
 
     try {
         const query = `INSERT INTO Train (FullCapacity, StoreID, Time, Day) VALUES (?, ?, ?, ?)`;
-        await connection.promise().query(query, [randomCapacity, randomStoreID, randomTime, randomDay]);
+        await pool.query(query, [randomCapacity, randomStoreID, randomTime, randomDay]);
         console.log(`Train with capacity ${randomCapacity} created successfully for Store ${randomStoreID} on ${randomDay} at ${randomTime}`);
     } catch (error) {
         console.log(error);
@@ -37,7 +37,6 @@ async function createRandomTrain(storeID) {
 
 // Function to generate and insert multiple random trains
 async function generateRandomTrains(count, numberOfStores) {
-    await connection.promise().query('DELETE FROM Train');
 
     for (let i = 0; i < count; i++) {
         const randomStoreID = Math.floor(Math.random() * numberOfStores) + 1;

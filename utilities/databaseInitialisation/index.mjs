@@ -10,7 +10,7 @@ import createOrders from "./createOrders.mjs";
 
 const storeCities = ['Kurunegala', 'Colombo', 'Galle', 'Kandy', 'Jaffna', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Matara', 'Ratnapura', 'Trincomalee', 'Vavuni'];
 const productCategories = ['Clothes', 'Groceries', 'Electronics', 'Cosmetics', 'KitchenItems', 'Others'];
-const orderStatuses = ['Pending', 'PendingTrain', 'TrainAssigned', 'InTrain', 'InStore', 'InShipment', 'InTruck', 'Delivered', 'Attention', 'Cancelled'];
+const orderStatuses = ['Pending', 'PendingTrain', 'TrainAssigned', 'InTrain', 'InStore', 'InShipment', 'InTruck', 'Attention', 'Delivered', 'Cancelled'];
 
 const databaseInitialisation = async () => {
     await storeCreation(storeCities);

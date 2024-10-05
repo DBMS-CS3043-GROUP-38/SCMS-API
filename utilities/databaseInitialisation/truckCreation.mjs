@@ -1,4 +1,4 @@
-import connection from '../database/db.mjs';
+import pool from '../database/db.mjs';
 
 // Function to generate a random license plate
 function getRandomLicensePlate() {
@@ -23,7 +23,7 @@ async function createTruck(storeID) {
 
     try {
         const query = `INSERT INTO Truck (StoreID, LicencePlate, Status) VALUES (?, ?, ?)`;
-        await connection.promise().query(query, [storeID, licensePlate, status]);
+        await pool.query(query, [storeID, licensePlate, status]);
         console.log(`Truck with license plate ${licensePlate} created for Store ${storeID} with status ${status}`);
     } catch (error) {
         console.log(error);
@@ -32,7 +32,6 @@ async function createTruck(storeID) {
 
 // Function to generate random trucks for each store
 async function generateRandomTrucks(numOfStores) {
-    await connection.promise().query('DELETE FROM Truck');
 
     for (let storeID = 1; storeID <= numOfStores; storeID++) {
         const numOfTrucks = Math.floor(Math.random() * 41) + 10; // Random number between 10 and 50

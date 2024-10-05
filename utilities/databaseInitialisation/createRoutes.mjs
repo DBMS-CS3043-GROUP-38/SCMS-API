@@ -1,4 +1,4 @@
-import connection from '../database/db.mjs';
+import pool from '../database/db.mjs';
 import { faker } from '@faker-js/faker';
 
 // Function to get a random integer within a range
@@ -8,7 +8,7 @@ function getRandomInt(min, max) {
 
 // Function to generate a random time duration in HH:MM:SS format
 function getRandomDuration() {
-    const hours = getRandomInt(0, 10);     // Random hours between 0 and 10
+    const hours = getRandomInt(2, 10);     // Random hours between 0 and 10
     const minutes = getRandomInt(0, 59);   // Random minutes between 0 and 59
     const seconds = getRandomInt(0, 59);   // Random seconds between 0 and 59
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -16,8 +16,6 @@ function getRandomDuration() {
 
 // Function to create a random route for each store
 async function createRoutesForStores(numStores) {
-    await connection.promise().query('DELETE FROM Route');
-
     let routesCreated = 0;
     try {
         for (let storeID = 1; storeID <= numStores; storeID++) {
@@ -27,7 +25,7 @@ async function createRoutesForStores(numStores) {
                 const timeDuration = getRandomDuration();
                 const description = faker.lorem.sentence();
 
-                await connection.promise().query(
+                await pool.query(
                     `INSERT INTO Route (Time_duration, Description, StoreID) VALUES (?, ?, ?)`,
                     [timeDuration, description, storeID]
                 );

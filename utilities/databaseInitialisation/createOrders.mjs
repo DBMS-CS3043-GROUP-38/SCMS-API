@@ -1,4 +1,4 @@
-import connection from '../database/db.mjs';
+import pool from '../database/db.mjs';
 
 // Function to get a random integer within a range
 function getRandomInt(min, max) {
@@ -12,23 +12,33 @@ function calculatePastDate(daysAgo) {
     return date.toISOString().split('T')[0]; // YYYY-MM-DD format
 }
 
-function calculatePasteTimeStamp(daysAgo) {
+function calculatePastTimeStamp(daysAgo) {
     const date = new Date();
     date.setDate(date.getDate() - daysAgo);
-    return date.toISOString(); // YYYY-MM-DDTHH:MM:SS format
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
+
 
 // Function to create an order with a fixed order date
 async function createOrder(orderDate, productCount, orderStatuses, day, routeCount, customerCount) {
     const customerID = getRandomInt(1, customerCount);
     const routeID = getRandomInt(1, routeCount);
-    const deliveryDate = calculatePastDate(day + getRandomInt(12, 20)); // Delivery date between 12 and 20 days after order date
-    const status = orderStatuses[Math.random() > 0.5 ? orderStatuses.length - 2 : orderStatuses.length - 1]; // Either 'Delivered' or 'Cancelled'
+    const delDate = day - getRandomInt(12, 20)
+    const deliveryDate = calculatePastDate(delDate); // Delivery date between 12 and 20 days after order date
+    const status = orderStatuses[Math.random() > 0.1 ? orderStatuses.length - 2 : orderStatuses.length - 1]; // Either 'Delivered' or 'Cancelled'
 
     try {
-        const [orderResult] = await connection.promise().query(
-            `INSERT INTO \`Order\` (CustomerID, ProductID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume, ShipmentID, TrainScheduleID)
-             VALUES (?, NULL, 0, ?, ?, ?, 0, NULL, NULL)`,
+        const [orderResult] = await pool.query(
+            `INSERT INTO \`Order\` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume, ShipmentID, TrainScheduleID)
+             VALUES (?, 0, ?, ?, ?, 0, NULL, NULL)`,
             [customerID, orderDate, deliveryDate, routeID]
         );
 
@@ -38,13 +48,21 @@ async function createOrder(orderDate, productCount, orderStatuses, day, routeCou
         for (let i = 0; i < getRandomInt(1, 10); i++) {
             const productID = getRandomInt(1, productCount);
             const amount = getRandomInt(1, 5); // Assuming each product amount is between 1 and 5
-            await connection.promise().query(
-                `INSERT INTO Contains (OrderID, ProductID, Amount) VALUES (?, ?, ?, ?)`,
+            await pool.query(
+                `INSERT INTO Contains (OrderID, ProductID, Amount) VALUES (?, ?, ?)`,
                 [orderID, productID, amount]
             );
         }
 
         await createTrackingRecord(orderID, orderStatuses, day);
+
+        // Create final tracking record
+        const finalTime = calculatePastTimeStamp(delDate);
+        await pool.query(
+            `INSERT INTO Order_Tracking (OrderID, TimeStamp, Status) VALUES (?, ?, ?)`,
+            [orderID, finalTime, status]
+        );
+
 
         console.log(`Order ${orderID} created on ${orderDate} with status ${status}`);
     } catch (error) {
@@ -53,10 +71,10 @@ async function createOrder(orderDate, productCount, orderStatuses, day, routeCou
 }
 
 async function createTrackingRecord(orderID, orderStatuses, day) {
-    for (let i = 0; i < orderStatuses.length; i++) {
+    for (let i = 0; i < orderStatuses.length - 3; i++) {
         const status = orderStatuses[i];
-        const timeStamp = calculatePasteTimeStamp(day + i); // Time stamp for each status
-        await connection.promise().query(
+        const timeStamp = calculatePastTimeStamp(day - i); // Time stamp for each status
+        await pool.query(
             `INSERT INTO Order_Tracking (OrderID, TimeStamp, Status) VALUES (?, ?, ?)`,
             [orderID, timeStamp, status]
         );
@@ -67,16 +85,11 @@ async function createTrackingRecord(orderID, orderStatuses, day) {
 
 // Function to create orders sequentially for each day in the past two years
 async function createOrdersForEachDay(productCount, orderStatuses, routeCount, customerCount) {
-    await connection.promise().query('DELETE FROM `Contains`');
-    await connection.promise().query('DELETE FROM `Order_Tracking`');
-    await connection.promise().query('DELETE FROM `Order`');
-
-
     const days = 365 * 2; // Past two years
 
     for (let day = days; day >= 0; day--) {
         const orderDate = calculatePastDate(day);
-        const numOrders = getRandomInt(1, 20); // Random orders per day
+        const numOrders = getRandomInt(1, 5); // Random orders per day
 
         for (let i = 0; i < numOrders; i++) {
             await createOrder(orderDate, productCount, orderStatuses, day, routeCount, customerCount);
