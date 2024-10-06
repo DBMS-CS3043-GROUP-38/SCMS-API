@@ -27,6 +27,8 @@ async function productCreation(categories) {
             createdProducts++;
         }
     }
+
+    await pool.end();
     return createdProducts;
 }
 

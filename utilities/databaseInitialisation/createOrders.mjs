@@ -95,6 +95,8 @@ async function createOrdersForEachDay(productCount, orderStatuses, routeCount, c
             await createOrder(orderDate, productCount, orderStatuses, day, routeCount, customerCount);
         }
     }
+
+    await pool.end();
 }
 
 export default createOrdersForEachDay;

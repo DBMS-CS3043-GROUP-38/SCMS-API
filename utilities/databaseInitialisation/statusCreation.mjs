@@ -15,6 +15,8 @@ async function statusCreation(statuses) {
     for (const status of statuses) {
         await createStatus({status});
     }
+
+    await pool.end();
 }
 
 export default statusCreation;

@@ -37,6 +37,8 @@ async function createRoutesForStores(numStores) {
     } catch (error) {
         console.error('Error creating routes:', error);
     }
+    //Close the pool
+    await pool.end();
     return routesCreated;
 }
 

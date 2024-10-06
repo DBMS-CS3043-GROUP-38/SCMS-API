@@ -42,6 +42,8 @@ async function generateRandomTrains(count, numberOfStores) {
         const randomStoreID = Math.floor(Math.random() * numberOfStores) + 1;
         await createRandomTrain(randomStoreID);
     }
+
+    await pool.end();
 }
 
 export default generateRandomTrains;

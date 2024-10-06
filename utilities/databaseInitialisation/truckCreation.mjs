@@ -28,6 +28,8 @@ async function createTruck(storeID) {
     } catch (error) {
         console.log(error);
     }
+
+    await pool.end();
 }
 
 // Function to generate random trucks for each store

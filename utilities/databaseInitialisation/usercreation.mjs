@@ -137,6 +137,8 @@ async function userCreation(cities) {
         createdCustomers++;
     }
 
+    await pool.end();
+
     return createdCustomers;
 }
 

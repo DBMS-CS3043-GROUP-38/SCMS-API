@@ -19,6 +19,8 @@ async function storeCreation(cities) {
     for (const city of cities) {
         await createStore(city);
     }
+
+    await pool.end();
 }
 
 export default storeCreation;
