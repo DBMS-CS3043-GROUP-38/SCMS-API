@@ -212,3 +212,33 @@ BEGIN
     WHERE OrderID = NEW.OrderID;
 END;
 # DELIMITER ;
+
+CREATE VIEW SalesSummaryViewPerQuarter AS
+SELECT
+    YEAR(o.OrderDate) AS Year,
+    QUARTER(o.OrderDate) AS Quarter,
+    p.ProductID,
+    p.Name AS ProductName,
+    p.Type AS ProductType,
+    SUM(c.Amount) AS TotalQuantity,
+    SUM(c.Amount * p.Price) AS TotalRevenue
+FROM
+    scms.`order` o
+        JOIN scms.Contains c ON o.OrderID = c.OrderID
+        JOIN scms.Product p ON c.ProductID = p.ProductID
+        JOIN (
+        SELECT OrderID, MAX(TimeStamp) AS LatestTimestamp
+        FROM scms.order_tracking
+        GROUP BY OrderID
+    ) latest_status ON o.OrderID = latest_status.OrderID
+        JOIN scms.order_tracking ot ON latest_status.OrderID = ot.OrderID
+        AND latest_status.LatestTimestamp = ot.TimeStamp
+WHERE
+    ot.Status = 'Delivered'
+GROUP BY
+    YEAR(o.OrderDate),
+    QUARTER(o.OrderDate),
+    p.ProductID
+ORDER BY
+    Quarter,
+    TotalRevenue DESC;

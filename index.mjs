@@ -1,7 +1,7 @@
 import express from "express";
-import mysql from "mysql2";
 import cors from "cors";
 import dotenv from "dotenv";
+import adminRoutes from './routes/users/admin/admin.mjs';
 
 dotenv.config();
 
@@ -11,19 +11,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const connection = mysql.createConnection({
-    host:process.env.MYSQL_HOST,
-    user: process.env.MYSQL_USER,
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE
-});
+// Routes
+app.use('/admin', adminRoutes);
 
-connection.connect((err) => {
-    if (err) {
-        console.log(err);
-    } else {
-        console.log("Connected to the database");
-    }
+app.get('/test', (req, res) => {
+    res.send('Server is working');
 });
 
 app.listen(PORT, () => {
