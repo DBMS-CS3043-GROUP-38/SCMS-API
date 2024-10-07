@@ -213,7 +213,7 @@ BEGIN
 END;
 # DELIMITER ;
 
-CREATE VIEW SalesSummaryViewPerQuarter AS
+CREATE VIEW Quarterly_Order_Report AS
 SELECT
     YEAR(o.OrderDate) AS Year,
     QUARTER(o.OrderDate) AS Quarter,
@@ -243,3 +243,23 @@ ORDER BY
     Quarter,
     TotalRevenue DESC;
 
+CREATE VIEW Quarterly_Store_Report AS
+SELECT
+    YEAR(o.OrderDate) AS Year,
+    QUARTER(o.OrderDate) AS Quarter,
+    s.StoreID,
+    s.City AS StoreCity,
+    COUNT(o.OrderID) AS NumberOfOrders,
+    SUM(o.Value) AS TotalRevenue
+FROM
+    `Order` o
+JOIN
+    `Route` r ON o.RouteID = r.RouteID
+JOIN
+    `Store` s ON r.StoreID = s.StoreID
+JOIN
+    `Order_Tracking` ot ON o.OrderID = ot.OrderID
+WHERE
+    ot.Status = 'Delivered'
+GROUP BY
+    YEAR(o.OrderDate), QUARTER(o.OrderDate), s.StoreID;
