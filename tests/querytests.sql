@@ -10,3 +10,12 @@ select * from (select
                from quarterly_order_report s) as Ranked where rn <=5;
 
 select * from quarterly_store_report order by Year, Quarter, TotalRevenue desc;
+
+select * from order_details_with_latest_status;
+
+select OrderDate, SUM(Value) as TotalRevenue
+from order_details_with_latest_status
+where OrderDate >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
+  AND LatestStatus NOT LIKE 'Cancelled'
+GROUP BY OrderDate
+ORDER BY OrderDate;
