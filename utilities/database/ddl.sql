@@ -242,3 +242,4 @@ GROUP BY
 ORDER BY
     Quarter,
     TotalRevenue DESC;
+
