@@ -47,10 +47,10 @@ router.get('/top-stores', async (req, res) => {
 router.get('/monthly-sales', async (req, res) => {
     try {
         const query = `
-            select YEAR(OrderDate)              as Year,
-                   MONTH(OrderDate)             as Month,
-                   COUNT(OrderID)               as TotalOrders,
-                   SUM(Value)                   as TotalRevenue
+            select YEAR(OrderDate)  as Year,
+                   MONTH(OrderDate) as Month,
+                   COUNT(OrderID)   as TotalOrders,
+                   SUM(Value)       as TotalRevenue
             from order_details_with_latest_status
             where OrderDate >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
               AND LatestStatus NOT LIKE 'Cancelled'
@@ -82,5 +82,88 @@ router.get('/daily-sales', async (req, res) => {
         res.status(500).json({error: 'Failed to fetch daily sales'});
     }
 });
+
+router.get('/monthly-income', async (req, res) => {
+    try {
+        const query = `
+            select SUM(Value) as TotalRevenue
+            from order_details_with_latest_status
+            where YEAR(OrderDate) = YEAR(CURDATE())
+              and MONTH(OrderDate) = MONTH(CURDATE())
+              and LatestStatus NOT LIKE 'Cancelled'
+            group by MONTH(OrderDate);        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({error: 'Failed to fetch monthly sales'});
+    }
+})
+
+router.get('/trains-today', async (req, res) => {
+    try {
+        const query = `
+        select StoreCity, ScheduleDateTime, FilledPercentage, FullCapacity from train_schedule_with_destinations where DATE(ScheduleDateTime) = CURDATE();
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({error: 'Failed to fetch trains today'});
+    }
+})
+
+router.post('/schedule-trains', async (req, res) => {
+    console.log('Scheduling trains');
+    try {
+        const query = `
+        select AddFutureTrains() as result;
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({error: 'Failed to schedule trains'});
+    }
+})
+
+router.get('/order-status', async (req, res) => {
+    try {
+        const query = `
+        select LatestStatus as Status, count(OrderID) from order_details_with_latest_status group by LatestStatus;
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({error: 'Failed to fetch order status'});
+    }
+})
+
+router.get('/most-ordered-city', async (req, res) => {
+    try {
+        const query =   `
+        select StoreCity, COUNT(OrderID) as Count from order_details_with_latest_status group by StoreCity order by Count desc ;
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({error: 'Failed to get most ordered city'});
+    }
+})
+
+router.get('/best-customers', async (req, res) => {
+    try {
+        const query = `
+        select * from customer_report limit 5;
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch best customers'});
+    }
+})
 
 export default router;

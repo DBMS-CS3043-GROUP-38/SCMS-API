@@ -1,4 +1,7 @@
 # Remember to uncomment delimiter lines if you are using MySQL Workbench
+drop schema scms;
+create schema scms;
+use scms;
 
 CREATE TABLE `Store`
 (
@@ -43,16 +46,6 @@ CREATE TABLE `Assistant`
     FOREIGN KEY (`EmployeeID`) REFERENCES `Employee` (`EmployeeID`)
 );
 
-CREATE TABLE `Shipment`
-(
-    `ShipmentID`     INT AUTO_INCREMENT,
-    `CreatedDate`    DATE           NOT NULL,
-    `Capacity`       DECIMAL(10, 2) NOT NULL,
-    `FilledCapacity` DECIMAL(10, 2),
-    `Status`         ENUM ('Ready', 'NotReady'),
-    PRIMARY KEY (`ShipmentID`)
-);
-
 CREATE TABLE `Product`
 (
     `ProductID`                INT AUTO_INCREMENT,
@@ -85,6 +78,13 @@ CREATE TABLE `TrainSchedule`
     FOREIGN KEY (`TrainID`) REFERENCES `Train` (`TrainID`)
 );
 
+create table `Train_Contains`
+(
+    `TrainScheduleID` INT,
+    `OrderID`         INT,
+    PRIMARY KEY (`TrainScheduleID`, `OrderID`),
+    FOREIGN KEY (`TrainScheduleID`) REFERENCES `TrainSchedule` (`TrainScheduleID`)
+);
 
 
 CREATE TABLE `Truck`
@@ -103,6 +103,7 @@ CREATE TABLE `Route`
     `Time_duration` TIME NOT NULL,
     `Description`   TEXT,
     `StoreID`       INT  NOT NULL,
+    `Distance`      DECIMAL(5, 2),
     PRIMARY KEY (`RouteID`),
     FOREIGN KEY (`StoreID`) REFERENCES Store (`StoreID`)
 );
@@ -127,20 +128,16 @@ CREATE TABLE `Customer`
 
 CREATE TABLE `Order`
 (
-    `OrderID`         INT AUTO_INCREMENT,
-    `CustomerID`      INT            NOT NULL,
-    `Value`           DECIMAL(10, 2) NOT NULL,
-    `OrderDate`       DATE           NOT NULL,
-    `DeliveryDate`    DATE,
-    `RouteID`         INT            NOT NULL,
-    `TotalVolume`     DECIMAL(10, 2) NOT NULL,
-    `ShipmentID`      INT,
-    `TrainScheduleID` INT,
+    `OrderID`      INT AUTO_INCREMENT,
+    `CustomerID`   INT            NOT NULL,
+    `Value`        DECIMAL(10, 2) NOT NULL,
+    `OrderDate`    DATE           NOT NULL,
+    `DeliveryDate` DATE,
+    `RouteID`      INT            NOT NULL,
+    `TotalVolume`  DECIMAL(10, 2) NOT NULL,
     PRIMARY KEY (`OrderID`),
-    FOREIGN KEY (`ShipmentID`) REFERENCES `Shipment` (`ShipmentID`),
     FOREIGN KEY (`CustomerID`) REFERENCES `Customer` (`CustomerID`),
-    FOREIGN KEY (`RouteID`) REFERENCES `Route` (`RouteID`),
-    FOREIGN KEY (`TrainScheduleID`) REFERENCES `TrainSchedule` (`TrainScheduleID`)
+    FOREIGN KEY (`RouteID`) REFERENCES `Route` (`RouteID`)
 );
 
 create table `Contains`
@@ -154,6 +151,26 @@ create table `Contains`
 );
 
 
+CREATE TABLE `Shipment`
+(
+    `ShipmentID`     INT AUTO_INCREMENT,
+    `CreatedDate`    DATE           NOT NULL,
+    `Capacity`       DECIMAL(10, 2) NOT NULL,
+    `RouteID`        INT            NOT NULL,
+    `FilledCapacity` DECIMAL(10, 2),
+    `Status`         ENUM ('Ready', 'NotReady', 'Completed'),
+    PRIMARY KEY (`ShipmentID`),
+    FOREIGN KEY (`RouteID`) REFERENCES `Route` (`RouteID`)
+);
+
+create table `Shipment_contains`
+(
+    `ShipmentID` INT NOT NULL,
+    `OrderID`    INT NOT NULL,
+    PRIMARY KEY (`ShipmentID`, `OrderID`),
+    FOREIGN KEY (`ShipmentID`) REFERENCES `Shipment` (`ShipmentID`)
+);
+
 
 CREATE TABLE `TruckSchedule`
 (
@@ -165,7 +182,7 @@ CREATE TABLE `TruckSchedule`
     `AssistantID`     INT  NOT NULL,
     `DriverID`        INT  NOT NULL,
     `TruckID`         INT  NOT NULL,
-    `Hours`           DECIMAL(5, 2),
+    `Hours`           TIME,
     `Status`          ENUM ('Future', 'Completed'),
     PRIMARY KEY (`TruckScheduleID`),
     FOREIGN KEY (`StoreID`) REFERENCES Store (`StoreID`),
@@ -186,7 +203,6 @@ CREATE TABLE `Order_Tracking`
     foreign key (`Status`) references `Order_status` (`Status`)
 );
 
-# DELIMITER //
 CREATE TRIGGER update_order_totals
     AFTER INSERT
     ON Contains
@@ -213,7 +229,6 @@ BEGIN
         Value       = Value + newValue
     WHERE OrderID = NEW.OrderID;
 END;
-# DELIMITER ;
 
 
 # Views
@@ -280,3 +295,110 @@ FROM `Order` o
      `Order_Tracking` ot ON o.OrderID = ot.OrderID
 WHERE ot.Status = 'Delivered'
 GROUP BY YEAR(o.OrderDate), QUARTER(o.OrderDate), s.StoreID;
+
+create view Train_Schedule_With_Destinations as
+select ts.TrainScheduleID,
+       (t.FullCapacity - ts.FilledCapacity)       as RemainingCapacity,
+       t.FullCapacity,
+       (ts.FilledCapacity / t.FullCapacity) * 100 as `FilledPercentage`,
+       ts.TrainID,
+       ts.ScheduleDateTime,
+       ts.Status,
+       t.StoreID,
+       t.Time,
+       t.Day,
+       s.City                                     as StoreCity
+from TrainSchedule ts
+         join Train t on ts.TrainID = t.TrainID
+         join Store s on t.StoreID = s.StoreID;
+
+
+create view customer_report as
+select c.CustomerID,
+       c.Name,
+       c.Username,
+       c.Address,
+       c.Type,
+       c.City,
+       count(o.OrderID) as TotalOrders,
+       sum(o.Value)     as TotalRevenue
+from Customer c
+         join
+     `Order` O on c.CustomerID = O.CustomerID
+group by c.CustomerID
+order by TotalRevenue desc;
+
+create view truck_report as
+select t.TruckID, t.LicencePlate, sum(r.Distance) as TotalDistance, sum(r.Time_duration) as TotalDuration
+from truck t
+         join
+     truckschedule ts on t.TruckID = ts.TruckID
+         join
+     route r on ts.RouteID = r.RouteID
+where ts.Status = 'Completed'
+group by t.TruckID;
+
+
+# Functions
+
+CREATE FUNCTION AddFutureTrains()
+    RETURNS INT
+    DETERMINISTIC
+BEGIN
+    DECLARE end_date DATE;
+    DECLARE start_date DATE;
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE train_id INT;
+    DECLARE full_capacity DECIMAL(10, 2);
+    DECLARE store_id INT;
+    DECLARE train_time TIME;
+    DECLARE train_day ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday');
+    DECLARE schedules_added INT DEFAULT 0;
+    DECLARE date_ptr DATE;
+
+    DECLARE train_cursor CURSOR FOR
+        SELECT TrainID, FullCapacity, StoreID, Time, Day
+        FROM Train;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    -- Set the end date to 30 days from now
+    SET end_date = DATE_ADD(CURDATE(), INTERVAL 30 DAY);
+
+    -- Set the start date to the last scheduled date or today
+    SELECT COALESCE(MAX(DATE(ScheduleDateTime)), CURDATE())
+    INTO start_date
+    FROM TrainSchedule
+    WHERE ScheduleDateTime >= CURDATE();
+
+    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
+    IF start_date >= end_date THEN
+        RETURN 0;
+    END IF;
+
+    -- Loop through each train
+    OPEN train_cursor;
+    read_loop:
+    LOOP
+        FETCH train_cursor INTO train_id, full_capacity, store_id, train_time, train_day;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+
+        -- Add schedules for this train
+        SET date_ptr = start_date;
+        WHILE date_ptr <= end_date
+            DO
+                IF DAYNAME(date_ptr) = train_day THEN
+                    INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
+                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Future');
+                    SET schedules_added = schedules_added + 1;
+                END IF;
+                SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
+            END WHILE;
+    END LOOP;
+
+    CLOSE train_cursor;
+
+    RETURN schedules_added;
+END;

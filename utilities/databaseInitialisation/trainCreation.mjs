@@ -43,7 +43,6 @@ async function generateRandomTrains(count, numberOfStores) {
         await createRandomTrain(randomStoreID);
     }
 
-    await pool.end();
 }
 
 export default generateRandomTrains;

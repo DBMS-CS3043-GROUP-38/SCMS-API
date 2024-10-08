@@ -37,8 +37,8 @@ async function createOrder(orderDate, productCount, orderStatuses, day, routeCou
 
     try {
         const [orderResult] = await pool.query(
-            `INSERT INTO \`Order\` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume, ShipmentID, TrainScheduleID)
-             VALUES (?, 0, ?, ?, ?, 0, NULL, NULL)`,
+            `INSERT INTO \`Order\` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+             VALUE (?, 0, ?, ?, ?, 0)`,
             [customerID, orderDate, deliveryDate, routeID]
         );
 
@@ -95,8 +95,6 @@ async function createOrdersForEachDay(productCount, orderStatuses, routeCount, c
             await createOrder(orderDate, productCount, orderStatuses, day, routeCount, customerCount);
         }
     }
-
-    await pool.end();
 }
 
 export default createOrdersForEachDay;

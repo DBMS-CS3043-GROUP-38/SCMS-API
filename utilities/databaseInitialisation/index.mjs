@@ -6,6 +6,9 @@ import trainCreation from "./trainCreation.mjs";
 import truckCreation from "./truckCreation.mjs";
 import createRoutesForStores from "./createRoutes.mjs";
 import createOrders from "./createOrders.mjs";
+import createShipment from "./createShipment.mjs";
+import truckSchedule from "./truckSchedule.mjs";
+import pool from '../database/db.mjs';
 
 
 const storeCities = ['Kurunegala', 'Colombo', 'Galle', 'Kandy', 'Jaffna', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Matara', 'Ratnapura', 'Trincomalee', 'Vavuni'];
@@ -21,11 +24,14 @@ const databaseInitialisation = async () => {
     await truckCreation(storeCities.length);
     const routesCreated = await createRoutesForStores(storeCities.length);
     await createOrders(nuOfProducts, orderStatuses, routesCreated, customerCount);
+    await createShipment();
+    await truckSchedule();
 }
 
 //Run the function
-databaseInitialisation().then(() => {
+databaseInitialisation().then(async () => {
     console.log("Database initialisation completed");
+    await pool.end()
     process.exit();
 }).catch((error) => {
     console.error("Database initialisation failed", error);

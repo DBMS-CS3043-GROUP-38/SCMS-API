@@ -25,9 +25,13 @@ async function createRoutesForStores(numStores) {
                 const timeDuration = getRandomDuration();
                 const description = faker.lorem.sentence();
 
+                //Random distance decimal(6,2) between 20 and 100
+                const distance = (Math.random() * 80 + 20).toFixed(2);
+
+
                 await pool.query(
-                    `INSERT INTO Route (Time_duration, Description, StoreID) VALUES (?, ?, ?)`,
-                    [timeDuration, description, storeID]
+                    `INSERT INTO Route (Time_duration, Description, StoreID, Distance) VALUES (?, ?, ?, ?)`,
+                    [timeDuration, description, storeID, distance]
                 );
 
                 console.log(`Route created for StoreID ${storeID} with duration ${timeDuration} and description: ${description}`);
@@ -37,8 +41,6 @@ async function createRoutesForStores(numStores) {
     } catch (error) {
         console.error('Error creating routes:', error);
     }
-    //Close the pool
-    await pool.end();
     return routesCreated;
 }
 

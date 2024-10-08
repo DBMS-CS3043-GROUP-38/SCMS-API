@@ -21,14 +21,14 @@ async function productCreation(categories) {
         const numberOfProducts = Math.floor(Math.random() * 100) + 1;
         for (let i = 0; i < numberOfProducts; i++) {
             const name = faker.commerce.productName();
-            const trainCapacityConsumption = Math.floor(Math.random() * 100) + 1;
-            const price = Math.floor(Math.random() * 10000) + 1;
+            //
+            const trainCapacityConsumption = (Math.random() * 10).toFixed(2);
+            //Random price decimal (10,2) between 100 and 10000
+            const price = (Math.random() * 9900 + 100).toFixed(2);
             await createProduct({name, trainCapacityConsumption, type: category, price});
             createdProducts++;
         }
     }
-
-    await pool.end();
     return createdProducts;
 }
 

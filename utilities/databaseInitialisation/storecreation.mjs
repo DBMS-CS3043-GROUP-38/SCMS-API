@@ -20,7 +20,6 @@ async function storeCreation(cities) {
         await createStore(city);
     }
 
-    await pool.end();
 }
 
 export default storeCreation;
