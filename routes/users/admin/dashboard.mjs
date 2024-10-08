@@ -156,13 +156,27 @@ router.get('/most-ordered-city', async (req, res) => {
 router.get('/best-customers', async (req, res) => {
     try {
         const query = `
-        select * from customer_report limit 5;
+        select * from customer_report order by TotalRevenue desc limit 5;
         `
         const [rows] = await pool.query(query);
         res.json(rows);
     } catch (e) {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch best customers'});
+    }
+})
+
+router.get('/best-trucks', async (req, res) => {
+    try {
+        console.log('Called');
+        const query = `
+        select * from truck_report order by TotalDistance desc limit 5;
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch best trucks'});
     }
 })
 

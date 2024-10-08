@@ -325,16 +325,16 @@ select c.CustomerID,
 from Customer c
          join
      `Order` O on c.CustomerID = O.CustomerID
-group by c.CustomerID
-order by TotalRevenue desc;
+group by c.CustomerID;
 
 create view truck_report as
-select t.TruckID, t.LicencePlate, sum(r.Distance) as TotalDistance, sum(r.Time_duration) as TotalDuration
+select t.TruckID, t.LicencePlate, sum(r.Distance) as TotalDistance, sum(r.Time_duration) as TotalDuration, s.City
 from truck t
          join
      truckschedule ts on t.TruckID = ts.TruckID
          join
      route r on ts.RouteID = r.RouteID
+         join store s on t.StoreID = s.StoreID
 where ts.Status = 'Completed'
 group by t.TruckID;
 
