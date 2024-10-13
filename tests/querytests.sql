@@ -25,4 +25,5 @@ SET `Status` = 'Completed'
 WHERE `ScheduleDateTime` < NOW();
 
 SET FOREIGN_KEY_CHECKS = 0;
+truncate table `TrainSchedule`;
 SET FOREIGN_KEY_CHECKS = 1;

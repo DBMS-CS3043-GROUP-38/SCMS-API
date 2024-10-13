@@ -74,7 +74,7 @@ CREATE TABLE `TrainSchedule`
     `FilledCapacity`   DECIMAL(10, 2) NOT NULL,
     `TrainID`          INT            NOT NULL,
     `ScheduleDateTime` TIMESTAMP      NOT NULL,
-    `Status`           ENUM ('Not Completed', 'Completed'),
+    `Status`           ENUM ('Not Completed', 'Completed', 'In Progress'),
     PRIMARY KEY (`TrainScheduleID`),
     FOREIGN KEY (`TrainID`) REFERENCES `Train` (`TrainID`)
 );
@@ -179,13 +179,13 @@ CREATE TABLE `TruckSchedule`
     `TruckScheduleID` INT AUTO_INCREMENT,
     `StoreID`         INT  NOT NULL,
     `ShipmentID`      INT  NOT NULL,
-    `ScheduleDate`    DATE NOT NULL,
+    `ScheduleDateTime`    TIMESTAMP NOT NULL,
     `RouteID`         INT  NOT NULL,
     `AssistantID`     INT  NOT NULL,
     `DriverID`        INT  NOT NULL,
     `TruckID`         INT  NOT NULL,
     `Hours`           TIME,
-    `Status`          ENUM ('Future', 'Completed'),
+    `Status`          ENUM ('Not Completed', 'In Progress', 'Completed'),
     PRIMARY KEY (`TruckScheduleID`),
     FOREIGN KEY (`StoreID`) REFERENCES Store (`StoreID`),
     FOREIGN KEY (`RouteID`) REFERENCES `Route` (`RouteID`),
@@ -204,6 +204,17 @@ CREATE TABLE `Order_Tracking`
     FOREIGN KEY (`OrderID`) REFERENCES `Order` (`OrderID`),
     foreign key (`Status`) references `Order_status` (`Status`)
 );
+
+
+# Triggers
+CREATE TRIGGER after_order_insert
+    AFTER INSERT ON `Order`
+    FOR EACH ROW
+BEGIN
+    INSERT INTO Order_Tracking (OrderID, TimeStamp, Status)
+    VALUES (NEW.OrderID, NOW(), 'Pending');
+END;
+
 
 CREATE TRIGGER update_order_totals
     AFTER INSERT
@@ -233,11 +244,49 @@ BEGIN
 END;
 
 
+CREATE TRIGGER before_train_contains_insert
+    BEFORE INSERT ON Train_Contains
+    FOR EACH ROW
+BEGIN
+    DECLARE total_volume DECIMAL(10, 2);
+    DECLARE full_capacity DECIMAL(10, 2);
+    DECLARE new_filled_capacity DECIMAL(10, 2);
+
+    -- Get the TotalVolume of the Order being added
+    SELECT TotalVolume INTO total_volume
+    FROM `Order`
+    WHERE OrderID = NEW.OrderID;
+
+    -- Get the FullCapacity of the Train
+    SELECT t.FullCapacity INTO full_capacity
+    FROM Train t
+             JOIN TrainSchedule ts ON t.TrainID = ts.TrainID
+    WHERE ts.TrainScheduleID = NEW.TrainScheduleID;
+
+    -- Calculate the new filled capacity
+    SELECT FilledCapacity + total_volume INTO new_filled_capacity
+    FROM TrainSchedule
+    WHERE TrainScheduleID = NEW.TrainScheduleID;
+
+    -- Check if the new filled capacity exceeds the full capacity
+    IF new_filled_capacity > full_capacity THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: Adding this order would exceed the train\'s full capacity.';
+    ELSE
+        -- Update the FilledCapacity in the TrainSchedule table
+        UPDATE TrainSchedule
+        SET FilledCapacity = new_filled_capacity
+        WHERE TrainScheduleID = NEW.TrainScheduleID;
+    END IF;
+END;
+
+
 # Views
 
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
        o.Value,
+       o.TotalVolume,
        o.OrderDate,
        r.StoreID,
        s.City       AS StoreCity,
@@ -309,10 +358,14 @@ select ts.TrainScheduleID,
        t.StoreID,
        t.Time,
        t.Day,
-       s.City                                     as StoreCity
+       s.City                                     as StoreCity,
+       COUNT(c.OrderID)                           as TotalOrders
 from TrainSchedule ts
          join Train t on ts.TrainID = t.TrainID
-         join Store s on t.StoreID = s.StoreID;
+         join Store s on t.StoreID = s.StoreID
+         left outer join train_contains c on ts.TrainScheduleID = c.TrainScheduleID
+group by ts.TrainScheduleID;
+;
 
 
 create view customer_report as
@@ -342,7 +395,6 @@ group by t.TruckID;
 
 
 # Functions
-
 CREATE FUNCTION AddFutureTrains()
     RETURNS INT
     DETERMINISTIC
@@ -461,7 +513,7 @@ BEGIN
             DO
                 IF DAYNAME(date_ptr) = train_day THEN
                     INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
-                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Future');
+                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
                     SET schedules_added = schedules_added + 1;
                 END IF;
                 SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);

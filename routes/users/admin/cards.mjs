@@ -54,14 +54,14 @@ router.get('/pending-orders', async (req, res) => {
         const query = `
             select count(OrderID) as pending
             from order_details_with_latest_status
-            where LatestStatus = 'PendingTrain'
+            where LatestStatus = 'Pending'
         `;
         const [rows] = await pool.query(query);
         const pending = rows[0].pending || 0;
 
         res.json({pending});
     } catch (e) {
-        res.send('Failed to fetch pending trains');
+        res.send('Failed to fetch pending orders');
     }
 })
 
@@ -101,6 +101,20 @@ router.get('/today-sales', async (req, res) => {
         res.json(data);
     } catch (e) {
         res.status(500).json({error: 'Failed to fetch today sales'});
+    }
+});
+
+router.get('/train-statuses', async (req, res) => {
+    try {
+        const query = `
+            select Status, count(TrainID) as count
+            from trainschedule
+            group by Status;
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({error: 'Failed to fetch train statuses'});
     }
 });
 

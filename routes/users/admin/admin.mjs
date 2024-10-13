@@ -4,12 +4,14 @@ import charts from './charts.mjs'
 import pool from "../../../utilities/database/db.mjs";
 import {transformTopProducts, transformTopStores} from "../../../utilities/transformations.mjs";
 import tables from './tables.mjs';
+import buttons from "./buttons.mjs";
 
 const router = express.Router();
 
 router.use('/cards', cards);
 router.use('/charts', charts);
 router.use('/tables', tables);
+router.use('/buttons', buttons);
 
 //Routes
 router.get('/test', (req, res) => {
