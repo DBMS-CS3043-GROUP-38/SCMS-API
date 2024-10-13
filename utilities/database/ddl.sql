@@ -1,5 +1,5 @@
 # Remember to uncomment delimiter lines if you are using MySQL Workbench
-drop schema scms;
+drop schema if exists scms;
 create schema scms;
 use scms;
 
@@ -16,6 +16,7 @@ CREATE TABLE `Employee`
     `Name`         VARCHAR(100)                                          NOT NULL,
     `Username`     VARCHAR(50)                                           NOT NULL,
     `Address`      VARCHAR(100),
+    `Contact`     VARCHAR(15),
     `PasswordHash` VARCHAR(200)                                          NOT NULL,
     `Type`         ENUM ('Admin', 'StoreManager', 'Driver', 'Assistant') NOT NULL,
     `StoreID`      INT,
@@ -62,7 +63,7 @@ CREATE TABLE `Train`
     `FullCapacity` DECIMAL(10, 2) NOT NULL,
     `StoreID`      INT            NOT NULL,
     `Time`         TIME           NOT NULL,
-    `Day`          ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'),
+    `Day`          ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
     PRIMARY KEY (`TrainID`),
     FOREIGN KEY (`StoreID`) REFERENCES Store (`StoreID`)
 );
@@ -73,7 +74,7 @@ CREATE TABLE `TrainSchedule`
     `FilledCapacity`   DECIMAL(10, 2) NOT NULL,
     `TrainID`          INT            NOT NULL,
     `ScheduleDateTime` TIMESTAMP      NOT NULL,
-    `Status`           ENUM ('Future', 'Completed'),
+    `Status`           ENUM ('Not Completed', 'Completed'),
     PRIMARY KEY (`TrainScheduleID`),
     FOREIGN KEY (`TrainID`) REFERENCES `Train` (`TrainID`)
 );
@@ -120,6 +121,7 @@ CREATE TABLE `Customer`
     `Username`     VARCHAR(50),
     `Name`         VARCHAR(100)             NOT NULL,
     `Address`      VARCHAR(100),
+    `Contact`      VARCHAR(15),
     `Type`         ENUM ('End', 'Retailer') NOT NULL,
     `City`         VARCHAR(50),
     `PasswordHash` VARCHAR(200),
@@ -256,7 +258,7 @@ FROM `Order` o
       GROUP BY OrderID) AS latest ON ot.OrderID = latest.OrderID AND ot.TimeStamp = latest.LatestTimeStamp;
 
 
-CREATE VIEW Quarterly_Order_Report AS
+CREATE VIEW Quarterly_Product_Report AS
 SELECT YEAR(o.OrderDate)       AS Year,
        QUARTER(o.OrderDate)    AS Quarter,
        p.ProductID,
@@ -352,7 +354,7 @@ BEGIN
     DECLARE full_capacity DECIMAL(10, 2);
     DECLARE store_id INT;
     DECLARE train_time TIME;
-    DECLARE train_day ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday');
+    DECLARE train_day ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
     DECLARE schedules_added INT DEFAULT 0;
     DECLARE date_ptr DATE;
 
@@ -370,6 +372,74 @@ BEGIN
     INTO start_date
     FROM TrainSchedule
     WHERE ScheduleDateTime >= CURDATE();
+
+
+    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
+    IF start_date >= end_date THEN
+        RETURN 0;
+    END IF;
+
+    -- Loop through each train
+    OPEN train_cursor;
+    read_loop:
+    LOOP
+        FETCH train_cursor INTO train_id, full_capacity, store_id, train_time, train_day;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+
+        -- Add schedules for this train
+        SET date_ptr = start_date;
+        WHILE date_ptr <= end_date
+            DO
+                IF DAYNAME(date_ptr) = train_day THEN
+                    INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
+                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
+                    SET schedules_added = schedules_added + 1;
+                END IF;
+                SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
+            END WHILE;
+    END LOOP;
+
+    CLOSE train_cursor;
+
+    RETURN schedules_added;
+END;
+
+
+CREATE FUNCTION AddFutureTrainsTest()
+    RETURNS INT
+    DETERMINISTIC
+BEGIN
+    DECLARE end_date DATE;
+    DECLARE start_date DATE;
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE train_id INT;
+    DECLARE full_capacity DECIMAL(10, 2);
+    DECLARE store_id INT;
+    DECLARE train_time TIME;
+    DECLARE train_day ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+    DECLARE schedules_added INT DEFAULT 0;
+    DECLARE date_ptr DATE;
+
+    DECLARE train_cursor CURSOR FOR
+        SELECT TrainID, FullCapacity, StoreID, Time, Day
+        FROM Train;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    -- Set the end date to 30 days from now
+    SET end_date = DATE_ADD(CURDATE(), INTERVAL 30 DAY);
+
+    -- Set the start date to the last scheduled date or today
+    SELECT COALESCE(MAX(DATE(ScheduleDateTime)), CURDATE())
+    INTO start_date
+    FROM TrainSchedule
+    WHERE ScheduleDateTime >= CURDATE();
+
+    -- Decrease 1 week from start date
+    SET start_date = DATE_SUB(start_date, INTERVAL 7 DAY);
+
 
     -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
     IF start_date >= end_date THEN
@@ -402,3 +472,4 @@ BEGIN
 
     RETURN schedules_added;
 END;
+

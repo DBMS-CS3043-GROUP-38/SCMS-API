@@ -13,3 +13,16 @@ group by t.TruckID;
 
 
 select * from truck_report;
+
+select * from quarterly_product_report;
+select * from quarterly_store_report;
+
+select AddFutureTrainsTest();
+
+
+UPDATE `TrainSchedule`
+SET `Status` = 'Completed'
+WHERE `ScheduleDateTime` < NOW();
+
+SET FOREIGN_KEY_CHECKS = 0;
+SET FOREIGN_KEY_CHECKS = 1;

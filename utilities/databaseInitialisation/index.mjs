@@ -11,7 +11,7 @@ import truckSchedule from "./truckSchedule.mjs";
 import pool from '../database/db.mjs';
 
 
-const storeCities = ['Kurunegala', 'Colombo', 'Galle', 'Kandy', 'Jaffna', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Matara', 'Ratnapura', 'Trincomalee', 'Vavuni'];
+const storeCities = ['Kurunegala', 'Colombo', 'Galle', 'Jaffna', 'Anuradhapura', 'Badulla', 'Batticaloa'];
 const productCategories = ['Clothes', 'Groceries', 'Electronics', 'Cosmetics', 'KitchenItems', 'Others'];
 const orderStatuses = ['Pending', 'PendingTrain', 'TrainAssigned', 'InTrain', 'InStore', 'InShipment', 'InTruck', 'Attention', 'Delivered', 'Cancelled'];
 
@@ -20,7 +20,7 @@ const databaseInitialisation = async () => {
     const customerCount = await userCreation(storeCities);
     const nuOfProducts = await productCreation(productCategories);
     await statusCreation(orderStatuses);
-    await trainCreation(50, storeCities.length);
+    await trainCreation(200, storeCities.length);
     await truckCreation(storeCities.length);
     const routesCreated = await createRoutesForStores(storeCities.length);
     await createOrders(nuOfProducts, orderStatuses, routesCreated, customerCount);

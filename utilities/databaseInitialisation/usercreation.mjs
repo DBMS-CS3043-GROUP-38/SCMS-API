@@ -9,11 +9,11 @@ const hashCountEnv = process.env.HASH_COUNT;
 const hashCount = hashCountEnv ? parseInt(hashCountEnv) : 10;
 
 async function createEmployee(data) {
-    const {name, username, address, password, StoreID, type} = data;
+    const {name, username, address, password, StoreID, type, contact} = data;
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
-        const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID) VALUES (?, ?, ?, ?, ?, ?)`;
-        const [result] = await pool.query(query, [name, username, address, hashedPassword, type, StoreID]);
+        const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID, Contact) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const [result] = await pool.query(query, [name, username, address, hashedPassword, type, StoreID, contact]);
 
         const id = result.insertId;
 
@@ -31,12 +31,12 @@ async function createEmployee(data) {
 }
 
 async function createCustomer(data) {
-    const {name, username, address, password, type, city} = data;
+    const {name, username, address, password, type, city, contact} = data;
 
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
-        const query = `INSERT INTO customer (Username, Name, Address, Type, City, PasswordHash) VALUES (?, ?, ?, ?, ?, ?)`;
-        await pool.query(query, [username, name, address, type, city, hashedPassword]);
+        const query = `INSERT INTO customer (Username, Name, Address, Type, City, PasswordHash, Contact) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        await pool.query(query, [username, name, address, type, city, hashedPassword, contact]);
         console.log(`Customer ${name} created successfully: username - ${username}, city - ${city}`);
     } catch (error) {
         console.log(error);
@@ -56,7 +56,8 @@ async function userCreation(cities) {
             address: faker.location.streetAddress(),
             password: 'Password@Admin',
             type: 'Admin',
-            StoreID: null
+            StoreID: null,
+            contact: faker.phone.number({style: 'national'})
         };
         await createEmployee(data);
     }
@@ -73,7 +74,8 @@ async function userCreation(cities) {
             address: faker.location.streetAddress(),
             password: 'Password@StoreManager',
             type: 'StoreManager',
-            StoreID: i
+            StoreID: i,
+            contact: faker.phone.number({style: 'national'})
         };
         await createEmployee(data);
     }
@@ -92,7 +94,8 @@ async function userCreation(cities) {
                 address: faker.location.streetAddress(),
                 password: 'Password@Driver',
                 type: 'Driver',
-                StoreID: i
+                StoreID: i,
+                contact: faker.phone.number({style: 'national'})
             };
             await createEmployee(data);
         }
@@ -109,7 +112,8 @@ async function userCreation(cities) {
                 address: faker.location.streetAddress(),
                 password: 'Password@Assistant',
                 type: 'Assistant',
-                StoreID: i
+                StoreID: i,
+                contact: faker.phone.number({style: 'national'})
             };
             await createEmployee(data);
         }
@@ -131,7 +135,8 @@ async function userCreation(cities) {
             address: faker.location.streetAddress(),
             password: 'Password@Customer',
             type: types[Math.floor(Math.random() * types.length)],
-            city: cities[Math.floor(Math.random() * cities.length)]
+            city: cities[Math.floor(Math.random() * cities.length)],
+            contact: faker.phone.number({style: 'national'})
         };
         await createCustomer(data);
         createdCustomers++;

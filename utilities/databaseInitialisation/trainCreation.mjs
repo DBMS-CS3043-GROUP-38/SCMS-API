@@ -2,7 +2,7 @@ import pool from '../database/db.mjs';
 
 // Function to generate a random day
 function getRandomDay() {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     return days[Math.floor(Math.random() * days.length)];
 }
 
