@@ -53,8 +53,7 @@ router.get('/revenue-past-month', async (req, res) => {
         const query = `
             select DATE_FORMAT(OrderDate, '%d %M') as day, SUM(Value) as revenue
             from order_details_with_latest_status
-            where 
-              LatestStatus NOT LIKE 'Cancelled'
+            where LatestStatus NOT LIKE 'Cancelled'
             group by (OrderDate)
             order by OrderDate desc
             limit 30;
@@ -65,6 +64,24 @@ router.get('/revenue-past-month', async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({error: 'Failed to fetch monthly revenue data'});
+    }
+});
+
+router.get('/revenue-per-store/:year/:quarter', async (req, res) => {
+    const {year, quarter} = req.params;
+    try {
+        const query = `
+            select StoreCity as store, TotalRevenue as revenue
+            from quarterly_store_report
+            where Year = ? and Quarter = ?
+            order by revenue desc;
+        `;
+        const [rows] = await pool.query(query, [year, quarter]);
+        console.log(`Fetched revenue per store data: ${rows.length} rows`);
+        res.json(rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: 'Failed to fetch revenue per store data'});
     }
 });
 

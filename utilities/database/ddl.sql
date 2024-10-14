@@ -16,7 +16,7 @@ CREATE TABLE `Employee`
     `Name`         VARCHAR(100)                                          NOT NULL,
     `Username`     VARCHAR(50)                                           NOT NULL,
     `Address`      VARCHAR(100),
-    `Contact`     VARCHAR(15),
+    `Contact`      VARCHAR(15),
     `PasswordHash` VARCHAR(200)                                          NOT NULL,
     `Type`         ENUM ('Admin', 'StoreManager', 'Driver', 'Assistant') NOT NULL,
     `StoreID`      INT,
@@ -176,16 +176,16 @@ create table `Shipment_contains`
 
 CREATE TABLE `TruckSchedule`
 (
-    `TruckScheduleID` INT AUTO_INCREMENT,
-    `StoreID`         INT  NOT NULL,
-    `ShipmentID`      INT  NOT NULL,
-    `ScheduleDateTime`    TIMESTAMP NOT NULL,
-    `RouteID`         INT  NOT NULL,
-    `AssistantID`     INT  NOT NULL,
-    `DriverID`        INT  NOT NULL,
-    `TruckID`         INT  NOT NULL,
-    `Hours`           TIME,
-    `Status`          ENUM ('Not Completed', 'In Progress', 'Completed'),
+    `TruckScheduleID`  INT AUTO_INCREMENT,
+    `StoreID`          INT       NOT NULL,
+    `ShipmentID`       INT       NOT NULL,
+    `ScheduleDateTime` TIMESTAMP NOT NULL,
+    `RouteID`          INT       NOT NULL,
+    `AssistantID`      INT       NOT NULL,
+    `DriverID`         INT       NOT NULL,
+    `TruckID`          INT       NOT NULL,
+    `Hours`            TIME,
+    `Status`           ENUM ('Not Completed', 'In Progress', 'Completed'),
     PRIMARY KEY (`TruckScheduleID`),
     FOREIGN KEY (`StoreID`) REFERENCES Store (`StoreID`),
     FOREIGN KEY (`RouteID`) REFERENCES `Route` (`RouteID`),
@@ -207,8 +207,11 @@ CREATE TABLE `Order_Tracking`
 
 
 # Triggers
+
+# Remember to comment this trigger when running order creation script
 CREATE TRIGGER after_order_insert
-    AFTER INSERT ON `Order`
+    AFTER INSERT
+    ON `Order`
     FOR EACH ROW
 BEGIN
     INSERT INTO Order_Tracking (OrderID, TimeStamp, Status)
@@ -245,7 +248,8 @@ END;
 
 
 CREATE TRIGGER before_train_contains_insert
-    BEFORE INSERT ON Train_Contains
+    BEFORE INSERT
+    ON Train_Contains
     FOR EACH ROW
 BEGIN
     DECLARE total_volume DECIMAL(10, 2);
@@ -253,18 +257,21 @@ BEGIN
     DECLARE new_filled_capacity DECIMAL(10, 2);
 
     -- Get the TotalVolume of the Order being added
-    SELECT TotalVolume INTO total_volume
+    SELECT TotalVolume
+    INTO total_volume
     FROM `Order`
     WHERE OrderID = NEW.OrderID;
 
     -- Get the FullCapacity of the Train
-    SELECT t.FullCapacity INTO full_capacity
+    SELECT t.FullCapacity
+    INTO full_capacity
     FROM Train t
              JOIN TrainSchedule ts ON t.TrainID = ts.TrainID
     WHERE ts.TrainScheduleID = NEW.TrainScheduleID;
 
     -- Calculate the new filled capacity
-    SELECT FilledCapacity + total_volume INTO new_filled_capacity
+    SELECT FilledCapacity + total_volume
+    INTO new_filled_capacity
     FROM TrainSchedule
     WHERE TrainScheduleID = NEW.TrainScheduleID;
 
@@ -285,6 +292,9 @@ END;
 
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
+       o.CustomerID,
+       c.Name       AS CustomerName,
+       c.Type       AS CustomerType,
        o.Value,
        o.TotalVolume,
        o.OrderDate,
@@ -292,7 +302,17 @@ SELECT o.OrderID,
        s.City       AS StoreCity,
        o.RouteID,
        ot.Status    AS LatestStatus,
-       ot.TimeStamp AS LatestTimeStamp
+       ot.TimeStamp AS LatestTimeStamp,
+       sc.ShipmentID,
+       ts.TruckScheduleID,
+       a.AssistantID,
+       a.Name       AS AssistantName,
+       d.DriverID,
+       d.Name       AS DriverName,
+       t.TruckID,
+       t.LicencePlate,
+       sh.Status    AS ShipmentStatus
+
 FROM `Order` o
          JOIN
      `Route` r ON o.RouteID = r.RouteID
@@ -304,8 +324,22 @@ FROM `Order` o
      (SELECT OrderID,
              MAX(TimeStamp) AS LatestTimeStamp
       FROM `Order_Tracking`
-      GROUP BY OrderID) AS latest ON ot.OrderID = latest.OrderID AND ot.TimeStamp = latest.LatestTimeStamp;
-
+      GROUP BY OrderID) AS latest ON ot.OrderID = latest.OrderID AND ot.TimeStamp = latest.LatestTimeStamp
+         join customer c on o.CustomerID = c.CustomerID
+         left outer join shipment_contains sc on o.OrderID = sc.OrderID
+         left outer join truckschedule ts on sc.ShipmentID = ts.ShipmentID
+         left outer join shipment sh on sc.ShipmentID = sh.ShipmentID
+         left outer join (select Truck.TruckID, Truck.LicencePlate
+                          from truckschedule
+                                   join truck on truckschedule.TruckID = truck.TruckID) t on ts.TruckID = t.TruckID
+         left outer join (select AssistantID, employee.Name
+                          from assistant
+                                   join employee on assistant.EmployeeID = employee.EmployeeID) a
+                         on ts.AssistantID = a.AssistantID
+         left outer join (select DriverID, employee.Name
+                          from driver
+                                   join employee on driver.EmployeeID = employee.EmployeeID) d
+                         on ts.DriverID = d.DriverID;
 
 CREATE VIEW Quarterly_Product_Report AS
 SELECT YEAR(o.OrderDate)       AS Year,
@@ -323,7 +357,8 @@ FROM `Order` o
                GROUP BY OrderID) latest_status ON o.OrderID = latest_status.OrderID
          JOIN order_tracking ot ON latest_status.OrderID = ot.OrderID
     AND latest_status.LatestTimestamp = ot.TimeStamp
-WHERE ot.Status = 'Delivered'
+WHERE ot.Status != 'Cancelled'
+   or ot.Status != 'Attention'
 GROUP BY YEAR(o.OrderDate),
          QUARTER(o.OrderDate),
          p.ProductID
@@ -344,7 +379,7 @@ FROM `Order` o
      `Store` s ON r.StoreID = s.StoreID
          JOIN
      `Order_Tracking` ot ON o.OrderID = ot.OrderID
-WHERE ot.Status = 'Delivered'
+WHERE ot.Status not in ('Cancelled', 'Attention')
 GROUP BY YEAR(o.OrderDate), QUARTER(o.OrderDate), s.StoreID;
 
 create view Train_Schedule_With_Destinations as

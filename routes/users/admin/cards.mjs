@@ -12,7 +12,8 @@ router.get('/quarterly-sales', async (req, res) => {
         const query = `
             select YEAR(OrderDate) as Year, QUARTER(OrderDate) as Quarter, SUM(Value) as TotalRevenue
             from order_details_with_latest_status
-            where LatestStatus NOT LIKE 'Cancelled'
+            where LatestStatus != 'Cancelled'
+               or LatestStatus != 'Attention'
             group by YEAR(OrderDate), QUARTER(OrderDate)
             order by Year desc, Quarter desc
             limit 2;
@@ -33,8 +34,8 @@ router.get('/quarterly-sales', async (req, res) => {
 router.get('/trains-completed', async (req, res) => {
     try {
         const query = `
-            SELECT COUNT(CASE WHEN Status = 'Completed' THEN 1 END) AS completed,
-                   COUNT(TrainID)                                   AS total
+            SELECT COUNT(CASE WHEN Status != 'Not Completed' THEN 1 END) AS completed,
+                   COUNT(TrainID)                                        AS total
             FROM trainschedule
             WHERE DATE(ScheduleDateTime) = CURDATE();
         `;
@@ -117,5 +118,70 @@ router.get('/train-statuses', async (req, res) => {
         res.status(500).json({error: 'Failed to fetch train statuses'});
     }
 });
+
+router.get('/quarterly-orders', async (req, res) => {
+    try {
+        const query = `
+            select YEAR(OrderDate) as Year, QUARTER(OrderDate) as Quarter, COUNT(OrderID) as TotalOrders
+            from order_details_with_latest_status
+            group by YEAR(OrderDate), QUARTER(OrderDate)
+            order by Year desc, Quarter desc
+            limit 2;
+        `
+        const [rows] = await pool.query(query);
+        const data = {
+            current: rows[0].TotalOrders,
+            previous: rows[1].TotalOrders
+        }
+
+        res.json(data);
+        console.log(`Quarterly orders data fetched: ${data} for the card`);
+    } catch (error) {
+        res.status(500).json({error: 'Failed to fetch quarterly orders'});
+    }
+})
+
+router.get('/quarterly-store', async (req, res) => {
+    try {
+        const query = `
+            select COUNT(OrderID) as TotalOrders, StoreID, StoreCity, SUM(Value) as TotalRevenue
+            from order_details_with_latest_status
+            where YEAR(CURDATE()) = YEAR(OrderDate)
+              and QUARTER(CURDATE()) = QUARTER(OrderDate)
+            group by StoreID
+            order by TotalRevenue desc limit 1;
+        `
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: 'Failed to fetch quarterly store data'});
+    }
+})
+
+router.get('/best-customer', async (req, res) => {
+    try {
+        const query = `
+            select c.Name as Name, c.City as City, c.CustomerID as ID, SUM(o.Value) as TotalRevenue
+            from (select *
+                  from order_details_with_latest_status
+                  where YEAR(OrderDate) = YEAR(CURDATE())
+                    and QUARTER(OrderDate) = QUARTER(CURDATE())
+                    and LatestStatus not in ('Cancelled', 'Attention')) o
+                     join (customer c) on (o.CustomerID = c.CustomerID)
+            group by o.CustomerID
+            order by sum(o.Value) desc
+            limit 1;
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: 'Failed to fetch best customer data'});
+    }
+
+
+})
 
 export default router;

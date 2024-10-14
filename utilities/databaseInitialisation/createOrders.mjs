@@ -71,7 +71,7 @@ async function createOrder(orderDate, productCount, orderStatuses, day, routeCou
 }
 
 async function createTrackingRecord(orderID, orderStatuses, day) {
-    for (let i = 1; i < orderStatuses.length - 3; i++) {
+    for (let i = 0; i < orderStatuses.length - 3; i++) {
         const status = orderStatuses[i];
         const timeStamp = calculatePastTimeStamp(day - i); // Time stamp for each status
         await pool.query(
@@ -87,7 +87,7 @@ async function createTrackingRecord(orderID, orderStatuses, day) {
 async function createOrdersForEachDay(productCount, orderStatuses, routeCount, customerCount) {
     const days = 365 * 2; // Past two years
 
-    for (let day = days; day >= 0; day--) {
+    for (let day = days; day >= 20; day--) {
         const orderDate = calculatePastDate(day);
         const numOrders = getRandomInt(1, 5); // Random orders per day
 

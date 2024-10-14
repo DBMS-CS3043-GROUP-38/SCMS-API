@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon index.mjs",
     "initialise-database": "node utilities/databaseInitialisation/index.mjs",
-    "reset-db": "node utilities/database/run-ddl.mjs"
+    "reset-db": "node utilities/database/run-ddl.mjs",
+    "simulate-orders": "node utilities/databaseInitialisation/OrderPlacingSimulation.js"
   },
   "repository": {
     "type": "git",
@@ -27,6 +28,7 @@
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.11.3",
+    "node-cron": "^3.0.3",
     "nodemon": "^3.1.7",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1"
