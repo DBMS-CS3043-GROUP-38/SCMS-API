@@ -91,14 +91,7 @@ INSERT INTO `Order_Tracking` (`OrderID`, `TimeStamp`, `Status`) VALUES
 
 
 
--- Check with dates and orderID
-INSERT INTO Shipment (CreatedDate, Capacity, RouteID, FilledCapacity, Status) VALUES
-('2024-09-01', 1000.00, 1, 200.00, 'Ready'),
-('2024-09-02', 1500.00, 2, 300.00, 'NotReady'),
-('2024-09-03', 1200.00, 3, 400.00, 'Ready'),
-('2024-09-04', 800.00, 1, 100.00, 'Completed'),
-('2024-09-05', 1100.00, 2, 500.00, 'Ready');
-
+-- Check with orderID
 INSERT INTO Shipment_contains (ShipmentID, OrderID) VALUES
 (1, 101),
 (1, 102),
