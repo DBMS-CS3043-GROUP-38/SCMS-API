@@ -576,3 +576,187 @@ END;
 //
 
 DELIMITER ;
+
+
+-- Insert dummy data into Order table
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (45, 150.75, '2024-10-01', '2024-10-05', 3, 75.50);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (112, 240.50, '2024-10-02', '2024-10-07', 5, 120.00);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (600, 180.00, '2024-10-03', '2024-10-09', 2, 90.25);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (850, 320.99, '2024-10-04', '2024-10-10', 4, 150.50);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (70, 400.25, '2024-10-05', '2024-10-12', 1, 200.75);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (230, 520.00, '2024-10-06', '2024-10-15', 6, 250.00);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (715, 250.00, '2024-10-07', '2024-10-14', 3, 125.00);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (910, 300.50, '2024-10-08', '2024-10-16', 5, 135.50);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (356, 600.80, '2024-10-09', '2024-10-20', 2, 300.40);
+
+INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
+VALUES (421, 720.00, '2024-10-10', '2024-10-22', 4, 360.00);
+
+
+-- View to see completed work hours for drivers and assistants in the current month
+CREATE VIEW WorkHours_CurrentMonth AS
+SELECT 
+    'Driver' AS Role,
+    D.EmployeeID,
+    E.Name,
+    D.CompletedHours
+FROM Driver D
+JOIN Employee E ON D.EmployeeID = E.EmployeeID
+WHERE MONTH(CURRENT_DATE()) = MONTH(CURDATE()) AND YEAR(CURRENT_DATE()) = YEAR(CURDATE())
+    
+UNION ALL
+
+SELECT 
+    'Assistant' AS Role,
+    A.EmployeeID,
+    E.Name,
+    A.CompletedHours
+FROM Assistant A
+JOIN Employee E ON A.EmployeeID = E.EmployeeID
+WHERE MONTH(CURRENT_DATE()) = MONTH(CURDATE()) AND YEAR(CURRENT_DATE()) = YEAR(CURDATE());
+
+
+-- Insert dummy data into Shipment table to check the Distance driven view works
+
+INSERT INTO Shipment (CreatedDate, Capacity, RouteID, FilledCapacity, Status)
+VALUES 
+-- Shipment #1
+('2024-10-15', 500.00, 1, 450.00, 'Ready'),
+
+-- Shipment #2
+('2024-10-14', 750.00, 2, 600.00, 'NotReady'),
+
+-- Shipment #3
+('2024-10-13', 1000.00, 3, 1000.00, 'Completed'),
+
+-- Shipment #4
+('2024-10-12', 600.00, 4, 400.00, 'Ready'),
+
+-- Shipment #5
+('2024-10-11', 1200.00, 5, 1150.00, 'Completed');
+
+
+-- Insert dummy data into TruckSchedule table
+
+INSERT INTO TruckSchedule (StoreID, ShipmentID, ScheduleDateTime, RouteID, AssistantID, DriverID, TruckID, Hours, Status)
+VALUES 
+-- Truck Schedule #1
+(1, 1, '2024-10-15 08:00:00', 1, 1, 1, 1, '08:00:00', 'In Progress'),
+
+-- Truck Schedule #2
+(2, 2, '2024-10-16 09:00:00', 2, 2, 2, 2, '07:30:00', 'Not Completed'),
+
+-- Truck Schedule #3
+(3, 3, '2024-10-17 07:30:00', 3, 3, 3, 3, '09:00:00', 'Completed'),
+
+-- Truck Schedule #4
+(4, 4, '2024-10-18 10:00:00', 4, 4, 4, 4, '06:00:00', 'In Progress'),
+
+-- Truck Schedule #5
+(5, 5, '2024-10-19 11:00:00', 5, 5, 5, 5, '08:30:00', 'Not Completed');
+
+
+--View for truck distances
+
+CREATE VIEW Truck_Distances AS
+SELECT 
+    ts.TruckID,
+    SUM(r.Distance) AS TotalDistance
+FROM
+    TruckSchedule ts
+    JOIN Route r ON ts.RouteID = r.RouteID
+WHERE
+    ts.Status = 'Completed'
+GROUP BY
+    ts.TruckID;
+
+
+-- Trigger to check and update remaining capacity of shipment when adding orders
+DELIMITER //
+
+CREATE TRIGGER check_shipment_capacity BEFORE INSERT ON Shipment_contains
+FOR EACH ROW
+BEGIN
+    DECLARE shipmentCapacity DECIMAL(10, 2);
+    DECLARE filledCapacity DECIMAL(10, 2);
+    DECLARE orderVolume DECIMAL(10, 2);
+
+    -- Get the shipment's capacity and filled capacity
+    SELECT Capacity, FilledCapacity INTO shipmentCapacity, filledCapacity 
+    FROM Shipment 
+    WHERE ShipmentID = NEW.ShipmentID;
+
+    -- Get the total volume of the order being added
+    SELECT TotalVolume INTO orderVolume 
+    FROM `Order` 
+    WHERE OrderID = NEW.OrderID;
+
+    -- Check if adding the order would exceed the capacity
+    IF (filledCapacity + orderVolume) > shipmentCapacity THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Adding this order exceeds the shipment capacity';
+    ELSE
+        -- Update the filled capacity
+        UPDATE Shipment
+        SET FilledCapacity = filledCapacity + orderVolume
+        WHERE ShipmentID = NEW.ShipmentID;
+    END IF;
+END //
+
+DELIMITER ;
+
+
+
+-- Trigger to check work hours for driver and assistant when creating a truck schedule
+DELIMITER //
+
+CREATE TRIGGER check_schedule_work_hours BEFORE INSERT ON TruckSchedule
+FOR EACH ROW
+BEGIN
+    DECLARE driverWorkingHours INT;
+    DECLARE driverCompletedHours INT;
+    DECLARE assistantWorkingHours INT;
+    DECLARE assistantCompletedHours INT;
+    DECLARE scheduleHours TIME;
+
+    -- Get working and completed hours for the driver
+    SELECT WorkingHours, CompletedHours INTO driverWorkingHours, driverCompletedHours
+    FROM Driver
+    WHERE DriverID = NEW.DriverID;
+
+    -- Get working and completed hours for the assistant
+    SELECT WorkingHours, CompletedHours INTO assistantWorkingHours, assistantCompletedHours
+    FROM Assistant
+    WHERE AssistantID = NEW.AssistantID;
+
+    -- Get the hours for the schedule
+    SET scheduleHours = NEW.Hours;
+
+    -- Check if the driver's hours exceed
+    IF (driverCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > driverWorkingHours THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds driver\'s available work hours';
+    END IF;
+
+    -- Check if the assistant's hours exceed
+    IF (assistantCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > assistantWorkingHours THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds assistant\'s available work hours';
+    END IF;
+END //
+
+DELIMITER ;
