@@ -208,8 +208,10 @@ CREATE TABLE `Order_Tracking`
 
 # Triggers
 
-# Remember to comment this trigger when running order creation script
+
 DELIMITER //
+
+# Remember to comment this trigger when running order creation script
 
 CREATE TRIGGER after_order_insert
     AFTER INSERT
@@ -294,7 +296,6 @@ END;
 
 
 # Views
-
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
        o.CustomerID,
@@ -303,6 +304,7 @@ SELECT o.OrderID,
        o.Value,
        o.TotalVolume,
        o.OrderDate,
+       tc.TrainScheduleID,
        r.StoreID,
        s.City       AS StoreCity,
        o.RouteID,
@@ -344,7 +346,9 @@ FROM `Order` o
          left outer join (select DriverID, employee.Name
                           from driver
                                    join employee on driver.EmployeeID = employee.EmployeeID) d
-                         on ts.DriverID = d.DriverID;
+                         on ts.DriverID = d.DriverID
+         left outer join train_contains tc on tc.OrderID = o.OrderID;
+;
 //
 
 CREATE VIEW Quarterly_Product_Report AS
@@ -477,75 +481,9 @@ ORDER BY
 
 # Functions
 
--- This function adds future train schedules for the next 30 days
--- These two functions will be implemented in the back end later. They are here for testing purposes
+-- This function adds future train schedules for the next 7 days
+-- These two functions might be implemented in the back end later.
 CREATE FUNCTION AddFutureTrains()
-    RETURNS INT
-    DETERMINISTIC
-BEGIN
-    DECLARE end_date DATE;
-    DECLARE start_date DATE;
-    DECLARE done INT DEFAULT FALSE;
-    DECLARE train_id INT;
-    DECLARE full_capacity DECIMAL(10, 2);
-    DECLARE store_id INT;
-    DECLARE train_time TIME;
-    DECLARE train_day ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
-    DECLARE schedules_added INT DEFAULT 0;
-    DECLARE date_ptr DATE;
-
-    DECLARE train_cursor CURSOR FOR
-        SELECT TrainID, FullCapacity, StoreID, Time, Day
-        FROM Train;
-
-    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
-
-    -- Set the end date to 30 days from now
-    SET end_date = DATE_ADD(CURDATE(), INTERVAL 30 DAY);
-
-    -- Set the start date to the last scheduled date or today
-    SELECT COALESCE(MAX(DATE(ScheduleDateTime)), CURDATE())
-    INTO start_date
-    FROM TrainSchedule
-    WHERE ScheduleDateTime >= CURDATE();
-
-
-    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
-    IF start_date >= end_date THEN
-        RETURN 0;
-    END IF;
-
-    -- Loop through each train
-    OPEN train_cursor;
-    read_loop:
-    LOOP
-        FETCH train_cursor INTO train_id, full_capacity, store_id, train_time, train_day;
-        IF done THEN
-            LEAVE read_loop;
-        END IF;
-
-        -- Add schedules for this train
-        SET date_ptr = start_date;
-        WHILE date_ptr <= end_date
-            DO
-                IF DAYNAME(date_ptr) = train_day THEN
-                    INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
-                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
-                    SET schedules_added = schedules_added + 1;
-                END IF;
-                SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
-            END WHILE;
-    END LOOP;
-
-    CLOSE train_cursor;
-
-    RETURN schedules_added;
-END;
-//
-
-
--- This function adds future train schedules for the next 7 days only for testing purposes
-CREATE FUNCTION AddFutureTrainsTest()
     RETURNS INT
     DETERMINISTIC
 BEGIN
@@ -575,11 +513,8 @@ BEGIN
     FROM TrainSchedule
     WHERE ScheduleDateTime >= CURDATE();
 
-#     -- Decrease 1 day from start date
-#     SET start_date = DATE_SUB(start_date, INTERVAL 1 DAY);
 
-
-    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
+    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 7 DAYS
     IF start_date >= end_date THEN
         RETURN 0;
     END IF;
@@ -611,5 +546,6 @@ BEGIN
     RETURN schedules_added;
 END;
 //
+
 
 DELIMITER ;
