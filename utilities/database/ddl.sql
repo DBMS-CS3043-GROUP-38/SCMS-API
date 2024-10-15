@@ -209,6 +209,8 @@ CREATE TABLE `Order_Tracking`
 # Triggers
 
 # Remember to comment this trigger when running order creation script
+DELIMITER //
+
 CREATE TRIGGER after_order_insert
     AFTER INSERT
     ON `Order`
@@ -217,6 +219,7 @@ BEGIN
     INSERT INTO Order_Tracking (OrderID, TimeStamp, Status)
     VALUES (NEW.OrderID, NOW(), 'Pending');
 END;
+//
 
 
 CREATE TRIGGER update_order_totals
@@ -245,6 +248,7 @@ BEGIN
         Value       = Value + newValue
     WHERE OrderID = NEW.OrderID;
 END;
+//
 
 
 CREATE TRIGGER before_train_contains_insert
@@ -286,6 +290,7 @@ BEGIN
         WHERE TrainScheduleID = NEW.TrainScheduleID;
     END IF;
 END;
+//
 
 
 # Views
@@ -340,6 +345,7 @@ FROM `Order` o
                           from driver
                                    join employee on driver.EmployeeID = employee.EmployeeID) d
                          on ts.DriverID = d.DriverID;
+//
 
 CREATE VIEW Quarterly_Product_Report AS
 SELECT YEAR(o.OrderDate)       AS Year,
@@ -364,6 +370,7 @@ GROUP BY YEAR(o.OrderDate),
          p.ProductID
 ORDER BY Quarter,
          TotalRevenue DESC;
+//
 
 CREATE VIEW Quarterly_Store_Report AS
 SELECT YEAR(o.OrderDate)    AS Year,
@@ -401,7 +408,7 @@ from TrainSchedule ts
          left outer join train_contains c on ts.TrainScheduleID = c.TrainScheduleID
 group by ts.TrainScheduleID;
 ;
-
+//
 
 create view customer_report as
 select c.CustomerID,
@@ -416,6 +423,7 @@ from Customer c
          join
      `Order` O on c.CustomerID = O.CustomerID
 group by c.CustomerID;
+//
 
 create view truck_report as
 select t.TruckID, t.LicencePlate, sum(r.Distance) as TotalDistance, sum(r.Time_duration) as TotalDuration, s.City
@@ -427,9 +435,13 @@ from truck t
          join store s on t.StoreID = s.StoreID
 where ts.Status = 'Completed'
 group by t.TruckID;
+//
 
 
 # Functions
+
+-- This function adds future train schedules for the next 30 days
+-- These two functions will be implemented in the back end later. They are here for testing purposes
 CREATE FUNCTION AddFutureTrains()
     RETURNS INT
     DETERMINISTIC
@@ -492,6 +504,7 @@ BEGIN
 
     RETURN schedules_added;
 END;
+//
 
 
 CREATE FUNCTION AddFutureTrainsTest()
@@ -525,7 +538,7 @@ BEGIN
     WHERE ScheduleDateTime >= CURDATE();
 
     -- Decrease 1 week from start date
-    SET start_date = DATE_SUB(start_date, INTERVAL 7 DAY);
+    SET start_date = DATE_SUB(start_date, INTERVAL 1 DAY);
 
 
     -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
@@ -559,4 +572,6 @@ BEGIN
 
     RETURN schedules_added;
 END;
+//
 
+DELIMITER ;
