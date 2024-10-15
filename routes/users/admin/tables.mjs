@@ -334,5 +334,21 @@ router.get('/orders-in-truck', async (req, res) => {
     }
 });
 
+router.get('/attention-orders', async (req, res) => {
+    try {
+        const query = `
+            select OrderID, StoreCity, o.CustomerID, o.CustomerName, c.Contact as CustomerContact, LatestTimeStamp as TimeStamp
+            from order_details_with_latest_status o join customer c on o.CustomerID = c.CustomerID 
+            where LatestStatus = 'Attention';
+        `
+
+        const [rows] = await pool.query(query);
+        console.log(`Fetched attention orders: ${rows.length} rows`);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch attention orders'});
+    }
+});
 
 export default router;
