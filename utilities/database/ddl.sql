@@ -351,6 +351,7 @@ from truckschedule ts
          join assistant_details_with_employee a on ts.AssistantID = a.AssistantID;
 
 
+# To get the order details with the latest status and some more details
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
        o.CustomerID,
@@ -389,11 +390,9 @@ FROM `Order` o
       GROUP BY OrderID) AS latest ON ot.OrderID = latest.OrderID AND ot.TimeStamp = latest.LatestTimeStamp
          join customer c on o.CustomerID = c.CustomerID
          left outer join shipment_contains sc on o.OrderID = sc.OrderID
-         left outer join truckschedule ts on sc.ShipmentID = ts.ShipmentID
          left outer join shipment sh on sc.ShipmentID = sh.ShipmentID
-         left outer join (select Truck.TruckID, Truck.LicencePlate
-                          from truckschedule
-                                   join truck on truckschedule.TruckID = truck.TruckID) t on ts.TruckID = t.TruckID
+         left outer join truckschedule ts on sh.ShipmentID = ts.ShipmentID
+         left outer join truck t on ts.TruckID = t.TruckID
          left outer join assistant_details_with_employee a
                          on ts.AssistantID = a.AssistantID
          left outer join (select DriverID, employee.Name
