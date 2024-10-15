@@ -437,6 +437,43 @@ where ts.Status = 'Completed'
 group by t.TruckID;
 //
 
+// to get the daily store sales (sales on a date for each store)
+CREATE VIEW v_daily_store_sales AS
+SELECT 
+    s.StoreID,
+    s.City AS StoreCity,
+    DATE(o.OrderDate) AS SaleDate,
+    COUNT(o.OrderID) AS NumberOfOrders,
+    SUM(o.Value) AS TotalRevenue
+FROM 
+    `Order` o
+JOIN 
+    Route r ON o.RouteID = r.RouteID
+JOIN 
+    Store s ON r.StoreID = s.StoreID
+JOIN 
+    Order_Tracking ot ON o.OrderID = ot.OrderID
+WHERE 
+    ot.Status NOT IN ('Cancelled', 'Attention')
+GROUP BY 
+    s.StoreID, s.City, DATE(o.OrderDate)
+ORDER BY 
+    SaleDate DESC, TotalRevenue DESC
+;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Functions
 
