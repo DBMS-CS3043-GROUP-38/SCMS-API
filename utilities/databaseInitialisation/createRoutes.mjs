@@ -19,7 +19,7 @@ async function createRoutesForStores(numStores) {
     let routesCreated = 0;
     try {
         for (let storeID = 1; storeID <= numStores; storeID++) {
-            const numRoutes = getRandomInt(3, 10); // Random number of routes per store (between 3 and 10)
+            const numRoutes = getRandomInt(2, 5); // Random number of routes per store (between 3 and 10)
 
             for (let i = 0; i < numRoutes; i++) {
                 const timeDuration = getRandomDuration();

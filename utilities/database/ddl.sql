@@ -206,11 +206,12 @@ CREATE TABLE `Order_Tracking`
 );
 
 
-
 DELIMITER //
 # Triggers
 
-# Remember to comment this trigger when running order creation script
+# comment this trigger when running order creation script and uncomment when running simulations
+
+# Auto adding pending status for new orders
 CREATE TRIGGER after_order_insert
     AFTER INSERT
     ON `Order`
@@ -221,7 +222,7 @@ BEGIN
 END;
 //
 
-
+# Trigger to update the total volume and value of an order when a new product is added to contains
 CREATE TRIGGER update_order_totals
     AFTER INSERT
     ON Contains
@@ -251,6 +252,7 @@ END;
 //
 
 
+# Trigger to update the total volume of a train when order is added to train_contains
 CREATE TRIGGER before_train_contains_insert
     BEFORE INSERT
     ON Train_Contains
@@ -292,57 +294,120 @@ BEGIN
 END;
 //
 
+# Trigger to check if the driver and assistant hours exceed the limit
+CREATE TRIGGER check_exceeding_hours BEFORE INSERT ON TruckSchedule
+FOR EACH ROW
+BEGIN
+    DECLARE total_driver_hours INT;
+    DECLARE total_assistant_hours INT;
+
+    -- Get total hours for the driver for the current week
+    SELECT IFNULL(SUM(Hours), 0) INTO total_driver_hours
+    FROM TruckSchedule
+    WHERE DriverID = NEW.DriverID
+      AND WEEK(ScheduleDateTime) = WEEK(NEW.ScheduleDateTime);
+
+    -- Get total hours for the assistant for the current week
+    SELECT IFNULL(SUM(Hours), 0) INTO total_assistant_hours
+    FROM TruckSchedule
+    WHERE AssistantID = NEW.AssistantID
+      AND WEEK(ScheduleDateTime) = WEEK(NEW.ScheduleDateTime);
+
+    -- Check if driver hours exceed 40 hours per week
+    IF total_driver_hours + NEW.Hours > 40 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Driver work hours exceed 40 hours per week';
+    END IF;
+
+    -- Check if assistant hours exceed 60 hours per week
+    IF total_assistant_hours + NEW.Hours > 60 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Assistant work hours exceed 60 hours per week';
+    END IF;
+END//
+
+CREATE TRIGGER check_consecutive_scheduling BEFORE INSERT ON TruckSchedule
+FOR EACH ROW
+BEGIN
+    DECLARE last_schedule_date TIMESTAMP;
+    DECLARE second_last_schedule_date TIMESTAMP;
+
+    -- Ensure driver is not assigned to consecutive schedules
+    SELECT ScheduleDateTime INTO last_schedule_date
+    FROM TruckSchedule
+    WHERE DriverID = NEW.DriverID
+    ORDER BY ScheduleDateTime DESC
+    LIMIT 1;
+
+    IF last_schedule_date IS NOT NULL AND TIMESTAMPDIFF(HOUR, last_schedule_date, NEW.ScheduleDateTime) < 24 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Driver cannot be assigned to consecutive schedules within 24 hours';
+    END IF;
+
+    -- Ensure assistant does not exceed two consecutive turns
+    SELECT ScheduleDateTime INTO second_last_schedule_date
+    FROM TruckSchedule
+    WHERE AssistantID = NEW.AssistantID
+    ORDER BY ScheduleDateTime DESC
+    LIMIT 1 OFFSET 1;
+
+    IF second_last_schedule_date IS NOT NULL AND TIMESTAMPDIFF(HOUR, second_last_schedule_date, NEW.ScheduleDateTime) < 24 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Assistant cannot have more than two consecutive turns within 24 hours';
+    END IF;
+END//
+
 
 # Views
 
+# TO get details of the driver with the employee details
 create view Driver_Details_With_Employee as
-    select d.DriverID,
-           d.EmployeeID,
-           e.Name,
-           e.Username,
-           e.Address,
-           e.Contact,
-           e.Type,
-           d.WorkingHours,
-           d.CompletedHours,
-           d.Status
-    from driver d
-             join employee e on d.EmployeeID = e.EmployeeID;
+select d.DriverID,
+       d.EmployeeID,
+       e.Name,
+       e.Username,
+       e.Address,
+       e.Contact,
+       e.Type,
+       d.WorkingHours,
+       d.CompletedHours,
+       d.Status
+from driver d
+         join employee e on d.EmployeeID = e.EmployeeID;
 //
 
-
+# TO get details of the assistant with the employee details
 create view Assistant_Details_With_Employee as
-    select a.AssistantID,
-           a.EmployeeID,
-           e.Name,
-           e.Username,
-           e.Address,
-           e.Contact,
-           e.Type,
-           a.WorkingHours,
-           a.CompletedHours,
-           a.Status
-    from assistant a
-             join employee e on a.EmployeeID = e.EmployeeID;
+select a.AssistantID,
+       a.EmployeeID,
+       e.Name,
+       e.Username,
+       e.Address,
+       e.Contact,
+       e.Type,
+       a.WorkingHours,
+       a.CompletedHours,
+       a.Status
+from assistant a
+         join employee e on a.EmployeeID = e.EmployeeID;
 //
 
-
+# To get details of the truck with the more details
 create view truck_schedule_with_details as
-    select
-        ts.TruckScheduleID,
-        ts.StoreID,
-        ts.ShipmentID,
-        ts.ScheduleDateTime,
-        ts.RouteID,
-        ts.AssistantID,
-        ts.DriverID,
-        ts.TruckID,
-        ts.Hours,
-        ts.Status,
-        s.City as StoreCity,
-        a.Name as AssistantName,
-        d.Name as DriverName,
-        t.LicencePlate
+select ts.TruckScheduleID,
+       ts.StoreID,
+       ts.ShipmentID,
+       ts.ScheduleDateTime,
+       ts.RouteID,
+       ts.AssistantID,
+       ts.DriverID,
+       ts.TruckID,
+       ts.Hours,
+       ts.Status,
+       s.City as StoreCity,
+       a.Name as AssistantName,
+       d.Name as DriverName,
+       t.LicencePlate
 from truckschedule ts
          join truck t on ts.TruckID = t.TruckID
          join route r on ts.RouteID = r.RouteID
@@ -351,6 +416,7 @@ from truckschedule ts
          join assistant_details_with_employee a on ts.AssistantID = a.AssistantID;
 
 
+# To get the order details with the latest status and some more details
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
        o.CustomerID,
@@ -389,11 +455,9 @@ FROM `Order` o
       GROUP BY OrderID) AS latest ON ot.OrderID = latest.OrderID AND ot.TimeStamp = latest.LatestTimeStamp
          join customer c on o.CustomerID = c.CustomerID
          left outer join shipment_contains sc on o.OrderID = sc.OrderID
-         left outer join truckschedule ts on sc.ShipmentID = ts.ShipmentID
          left outer join shipment sh on sc.ShipmentID = sh.ShipmentID
-         left outer join (select Truck.TruckID, Truck.LicencePlate
-                          from truckschedule
-                                   join truck on truckschedule.TruckID = truck.TruckID) t on ts.TruckID = t.TruckID
+         left outer join truckschedule ts on sh.ShipmentID = ts.ShipmentID
+         left outer join truck t on ts.TruckID = t.TruckID
          left outer join assistant_details_with_employee a
                          on ts.AssistantID = a.AssistantID
          left outer join (select DriverID, employee.Name
@@ -404,6 +468,26 @@ FROM `Order` o
 ;
 //
 
+# To get the total completed hours of the driver
+CREATE VIEW DriverCompletedHours AS
+SELECT D.DriverID, E.Name, SUM(TS.Hours) AS TotalCompletedHours
+FROM Driver D
+JOIN Employee E ON D.EmployeeID = E.EmployeeID
+JOIN TruckSchedule TS ON D.DriverID = TS.DriverID
+WHERE TS.Status = 'Completed'
+GROUP BY D.DriverID;
+
+CREATE VIEW AssistantCompletedHours AS
+SELECT A.AssistantID, E.Name, SUM(TS.Hours) AS TotalCompletedHours
+FROM Assistant A
+JOIN Employee E ON A.EmployeeID = E.EmployeeID
+JOIN TruckSchedule TS ON A.AssistantID = TS.AssistantID
+WHERE TS.Status = 'Completed'
+GROUP BY A.AssistantID;
+//
+
+
+# To get sales mady by each product per quarter
 CREATE VIEW Quarterly_Product_Report AS
 SELECT YEAR(o.OrderDate)       AS Year,
        QUARTER(o.OrderDate)    AS Quarter,
@@ -429,6 +513,7 @@ ORDER BY Quarter,
          TotalRevenue DESC;
 //
 
+# To get the total revenue and number of orders per quarter for each store
 CREATE VIEW Quarterly_Store_Report AS
 SELECT YEAR(o.OrderDate)    AS Year,
        QUARTER(o.OrderDate) AS Quarter,
@@ -445,7 +530,9 @@ FROM `Order` o
      `Order_Tracking` ot ON o.OrderID = ot.OrderID
 WHERE ot.Status not in ('Cancelled', 'Attention')
 GROUP BY YEAR(o.OrderDate), QUARTER(o.OrderDate), s.StoreID;
+//
 
+# To get the train schedule with percentages and destinations
 create view Train_Schedule_With_Destinations as
 select ts.TrainScheduleID,
        (t.FullCapacity - ts.FilledCapacity)       as RemainingCapacity,
@@ -467,6 +554,7 @@ group by ts.TrainScheduleID;
 ;
 //
 
+# To get the total revenue and number of orders for each customer
 create view customer_report as
 select c.CustomerID,
        c.Name,
@@ -482,6 +570,7 @@ from Customer c
 group by c.CustomerID;
 //
 
+# To get the total distance and duration for each truck
 create view truck_report as
 select t.TruckID, t.LicencePlate, sum(r.Distance) as TotalDistance, sum(r.Time_duration) as TotalDuration, s.City
 from truck t
@@ -496,26 +585,21 @@ group by t.TruckID;
 
 # to get the daily store sales (sales on a date for each store)
 CREATE VIEW v_daily_store_sales AS
-SELECT 
-    s.StoreID,
-    s.City AS StoreCity,
-    DATE(o.OrderDate) AS SaleDate,
-    COUNT(o.OrderID) AS NumberOfOrders,
-    SUM(o.Value) AS TotalRevenue
-FROM 
-    `Order` o
-JOIN 
-    Route r ON o.RouteID = r.RouteID
-JOIN 
-    Store s ON r.StoreID = s.StoreID
-JOIN 
-    Order_Tracking ot ON o.OrderID = ot.OrderID
-WHERE 
-    ot.Status NOT IN ('Cancelled', 'Attention')
-GROUP BY 
-    s.StoreID, s.City, DATE(o.OrderDate)
-ORDER BY 
-    SaleDate DESC, TotalRevenue DESC
+SELECT s.StoreID,
+       s.City            AS StoreCity,
+       DATE(o.OrderDate) AS SaleDate,
+       COUNT(o.OrderID)  AS NumberOfOrders,
+       SUM(o.Value)      AS TotalRevenue
+FROM `Order` o
+         JOIN
+     Route r ON o.RouteID = r.RouteID
+         JOIN
+     Store s ON r.StoreID = s.StoreID
+         JOIN
+     Order_Tracking ot ON o.OrderID = ot.OrderID
+WHERE ot.Status NOT IN ('Cancelled', 'Attention')
+GROUP BY s.StoreID, s.City, DATE(o.OrderDate)
+ORDER BY SaleDate DESC, TotalRevenue DESC
 ;
 //
 

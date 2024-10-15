@@ -27,3 +27,6 @@ WHERE `ScheduleDateTime` < NOW();
 SET FOREIGN_KEY_CHECKS = 0;
 truncate table `TrainSchedule`;
 SET FOREIGN_KEY_CHECKS = 1;
+
+
+insert into truckschedule (StoreID, ShipmentID, ScheduleDateTime, RouteID, AssistantID, DriverID, TruckID, Hours, Status) VALUE (5,29,'2024-10-17 10:00:00', 19, 1, 1, 1, '07:04:41', 'Not Completed');

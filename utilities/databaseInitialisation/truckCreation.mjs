@@ -35,7 +35,7 @@ async function createTruck(storeID) {
 async function generateRandomTrucks(numOfStores) {
 
     for (let storeID = 1; storeID <= numOfStores; storeID++) {
-        const numOfTrucks = Math.floor(Math.random() * 41) + 10; // Random number between 10 and 50
+        const numOfTrucks = Math.floor(Math.random() * 11) + 10; // Random number between 10 and 20
 
         for (let i = 0; i < numOfTrucks; i++) {
             await createTruck(storeID);

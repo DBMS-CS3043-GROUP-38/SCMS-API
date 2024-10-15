@@ -30,7 +30,7 @@ connection.connect((err) => {
 
 // Schedule a task to run every minute
 cron.schedule('* * * * *', async () => {
-    console.log('Running a task every minute');
+    console.log('Creating a new order');
 
     // Define your SQL query
     const getCustomerCount = `select count(*) as count

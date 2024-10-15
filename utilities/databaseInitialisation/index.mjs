@@ -20,12 +20,12 @@ const databaseInitialisation = async () => {
     const customerCount = await userCreation(storeCities);
     const nuOfProducts = await productCreation(productCategories);
     await statusCreation(orderStatuses);
-    await trainCreation(200, storeCities.length);
+    await trainCreation(50, storeCities.length);
     await truckCreation(storeCities.length);
     const routesCreated = await createRoutesForStores(storeCities.length);
-    // await createOrders(nuOfProducts, orderStatuses, routesCreated, customerCount);
-    // await createShipment();
-    // await truckSchedule();
+    await createOrders(nuOfProducts, orderStatuses, routesCreated, customerCount);
+    await createShipment();
+    await truckSchedule();
 }
 
 //Run the function
