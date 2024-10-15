@@ -292,6 +292,101 @@ BEGIN
 END;
 //
 
+CREATE TRIGGER check_exceeding_hours 
+        BEFORE INSERT ON TruckSchedule
+        FOR EACH ROW
+BEGIN
+    DECLARE total_driver_hours INT;
+    DECLARE total_assistant_hours INT;
+
+    -- Get total hours for the driver for the current week
+    SELECT IFNULL(SUM(Hours), 0) INTO total_driver_hours
+    FROM TruckSchedule
+    WHERE DriverID = NEW.DriverID 
+      AND WEEK(ScheduleDateTime) = WEEK(NEW.ScheduleDateTime);
+
+    -- Get total hours for the assistant for the current week
+    SELECT IFNULL(SUM(Hours), 0) INTO total_assistant_hours
+    FROM TruckSchedule
+    WHERE AssistantID = NEW.AssistantID 
+      AND WEEK(ScheduleDateTime) = WEEK(NEW.ScheduleDateTime);
+
+    -- Check if driver hours exceed 40 hours per week
+    IF total_driver_hours + NEW.Hours > 40 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Driver work hours exceed 40 hours per week';
+    END IF;
+
+    -- Check if assistant hours exceed 60 hours per week
+    IF total_assistant_hours + NEW.Hours > 60 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Assistant work hours exceed 60 hours per week';
+    END IF;
+END;
+//
+
+CREATE TRIGGER check_consecutive_scheduling BEFORE INSERT ON TruckSchedule
+FOR EACH ROW
+BEGIN
+    DECLARE last_schedule_date TIMESTAMP;
+    DECLARE second_last_schedule_date TIMESTAMP;
+
+    -- Ensure driver is not assigned to consecutive schedules
+    SELECT ScheduleDateTime INTO last_schedule_date
+    FROM TruckSchedule
+    WHERE DriverID = NEW.DriverID
+    ORDER BY ScheduleDateTime DESC
+    LIMIT 1;
+
+    IF last_schedule_date IS NOT NULL AND TIMESTAMPDIFF(HOUR, last_schedule_date, NEW.ScheduleDateTime) < 24 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Driver cannot be assigned to consecutive schedules within 24 hours';
+    END IF;
+
+    -- Ensure assistant does not exceed two consecutive turns
+    SELECT ScheduleDateTime INTO second_last_schedule_date
+    FROM TruckSchedule
+    WHERE AssistantID = NEW.AssistantID
+    ORDER BY ScheduleDateTime DESC
+    LIMIT 1 OFFSET 1;
+
+    IF second_last_schedule_date IS NOT NULL AND TIMESTAMPDIFF(HOUR, second_last_schedule_date, NEW.ScheduleDateTime) < 24 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Assistant cannot have more than two consecutive turns within 24 hours';
+    END IF;
+END;
+//
+
+CREATE TRIGGER update_shipment_capacity BEFORE INSERT ON Shipment_contains
+FOR EACH ROW
+BEGIN
+    DECLARE shipment_capacity DECIMAL(10,2);
+    DECLARE filled_capacity DECIMAL(10,2);
+    DECLARE order_capacity DECIMAL(10,2);
+    
+    -- Get the total capacity of the shipment
+    SELECT Capacity, FilledCapacity INTO shipment_capacity, filled_capacity
+    FROM Shipment
+    WHERE ShipmentID = NEW.ShipmentID;
+    
+    -- Get the capacity required by the order (assuming Order table has `OrderCapacity` field)
+    SELECT OrderCapacity INTO order_capacity
+    FROM `Order`
+    WHERE OrderID = NEW.OrderID;
+    
+    -- Check if adding the new order exceeds the shipment's total capacity
+    IF (filled_capacity + order_capacity) > shipment_capacity THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Cannot add order, shipment capacity exceeded';
+    ELSE
+        -- Update the filled capacity of the shipment
+        UPDATE Shipment
+        SET FilledCapacity = filled_capacity + order_capacity
+        WHERE ShipmentID = NEW.ShipmentID;
+    END IF;
+END;
+//
+    
 
 # Views
 
@@ -517,6 +612,26 @@ GROUP BY
 ORDER BY 
     SaleDate DESC, TotalRevenue DESC
 ;
+//
+
+# to view hours worked by drivers
+CREATE VIEW DriverCompletedHours AS
+SELECT D.DriverID, E.Name, SUM(TS.Hours) AS TotalCompletedHours
+FROM Driver D
+JOIN Employee E ON D.EmployeeID = E.EmployeeID
+JOIN TruckSchedule TS ON D.DriverID = TS.DriverID
+WHERE TS.Status = 'Completed'
+GROUP BY D.DriverID;
+//
+        
+# to view hours worked by assistants
+CREATE VIEW AssistantCompletedHours AS
+SELECT A.AssistantID, E.Name, SUM(TS.Hours) AS TotalCompletedHours
+FROM Assistant A
+JOIN Employee E ON A.EmployeeID = E.EmployeeID
+JOIN TruckSchedule TS ON A.AssistantID = TS.AssistantID
+WHERE TS.Status = 'Completed'
+GROUP BY A.AssistantID;
 //
 
 # Functions
