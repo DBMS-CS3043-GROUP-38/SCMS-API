@@ -206,13 +206,11 @@ CREATE TABLE `Order_Tracking`
 );
 
 
-# Triggers
-
 
 DELIMITER //
+# Triggers
 
 # Remember to comment this trigger when running order creation script
-
 CREATE TRIGGER after_order_insert
     AFTER INSERT
     ON `Order`
@@ -296,6 +294,63 @@ END;
 
 
 # Views
+
+create view Driver_Details_With_Employee as
+    select d.DriverID,
+           d.EmployeeID,
+           e.Name,
+           e.Username,
+           e.Address,
+           e.Contact,
+           e.Type,
+           d.WorkingHours,
+           d.CompletedHours,
+           d.Status
+    from driver d
+             join employee e on d.EmployeeID = e.EmployeeID;
+//
+
+
+create view Assistant_Details_With_Employee as
+    select a.AssistantID,
+           a.EmployeeID,
+           e.Name,
+           e.Username,
+           e.Address,
+           e.Contact,
+           e.Type,
+           a.WorkingHours,
+           a.CompletedHours,
+           a.Status
+    from assistant a
+             join employee e on a.EmployeeID = e.EmployeeID;
+//
+
+
+create view truck_schedule_with_details as
+    select
+        ts.TruckScheduleID,
+        ts.StoreID,
+        ts.ShipmentID,
+        ts.ScheduleDateTime,
+        ts.RouteID,
+        ts.AssistantID,
+        ts.DriverID,
+        ts.TruckID,
+        ts.Hours,
+        ts.Status,
+        s.City as StoreCity,
+        a.Name as AssistantName,
+        d.Name as DriverName,
+        t.LicencePlate
+from truckschedule ts
+         join truck t on ts.TruckID = t.TruckID
+         join route r on ts.RouteID = r.RouteID
+         join store s on t.StoreID = s.StoreID
+         join driver_details_with_employee d on ts.DriverID = d.DriverID
+         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID;
+
+
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
        o.CustomerID,
@@ -339,9 +394,7 @@ FROM `Order` o
          left outer join (select Truck.TruckID, Truck.LicencePlate
                           from truckschedule
                                    join truck on truckschedule.TruckID = truck.TruckID) t on ts.TruckID = t.TruckID
-         left outer join (select AssistantID, employee.Name
-                          from assistant
-                                   join employee on assistant.EmployeeID = employee.EmployeeID) a
+         left outer join assistant_details_with_employee a
                          on ts.AssistantID = a.AssistantID
          left outer join (select DriverID, employee.Name
                           from driver
@@ -441,7 +494,7 @@ where ts.Status = 'Completed'
 group by t.TruckID;
 //
 
-// to get the daily store sales (sales on a date for each store)
+# to get the daily store sales (sales on a date for each store)
 CREATE VIEW v_daily_store_sales AS
 SELECT 
     s.StoreID,
@@ -464,20 +517,7 @@ GROUP BY
 ORDER BY 
     SaleDate DESC, TotalRevenue DESC
 ;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+//
 
 # Functions
 
@@ -504,7 +544,7 @@ BEGIN
 
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
-    -- Set the end date to 30 days from now
+    -- Set the end date to 7 days from now
     SET end_date = DATE_ADD(CURDATE(), INTERVAL 7 DAY);
 
     -- Set the start date to the last scheduled date or today
