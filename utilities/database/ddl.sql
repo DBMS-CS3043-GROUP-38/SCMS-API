@@ -208,8 +208,10 @@ CREATE TABLE `Order_Tracking`
 
 # Triggers
 
-# Remember to comment this trigger when running order creation script
+
 DELIMITER //
+
+# Remember to comment this trigger when running order creation script
 
 CREATE TRIGGER after_order_insert
     AFTER INSERT
