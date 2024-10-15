@@ -507,6 +507,7 @@ END;
 //
 
 
+-- This function adds future train schedules for the next 7 days only for testing purposes
 CREATE FUNCTION AddFutureTrainsTest()
     RETURNS INT
     DETERMINISTIC
@@ -529,7 +530,7 @@ BEGIN
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
     -- Set the end date to 30 days from now
-    SET end_date = DATE_ADD(CURDATE(), INTERVAL 30 DAY);
+    SET end_date = DATE_ADD(CURDATE(), INTERVAL 7 DAY);
 
     -- Set the start date to the last scheduled date or today
     SELECT COALESCE(MAX(DATE(ScheduleDateTime)), CURDATE())
@@ -537,8 +538,8 @@ BEGIN
     FROM TrainSchedule
     WHERE ScheduleDateTime >= CURDATE();
 
-    -- Decrease 1 week from start date
-    SET start_date = DATE_SUB(start_date, INTERVAL 1 DAY);
+#     -- Decrease 1 day from start date
+#     SET start_date = DATE_SUB(start_date, INTERVAL 1 DAY);
 
 
     -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
