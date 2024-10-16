@@ -162,7 +162,7 @@ router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
             from quarterly_product_report
             where Year = ${year}
               and Quarter = ${quarter}
-            order by revenue desc;
+            order by revenue desc limit 100;
         `;
         const [rows] = await pool.query(query);
         res.json(rows);
@@ -187,7 +187,7 @@ router.get('/top-customers-quarter/:year/:quarter', async (req, res) => {
                     and LatestStatus not in ('Cancelled', 'Attention')) o
                      join customer c on o.CustomerID = c.CustomerID
             group by o.CustomerID
-            order by Revenue desc;
+            order by Revenue desc limit 100;
         `;
         const [rows] = await pool.query(query);
         console.log(`Fetched top customers for ${year} Q${quarter}: ${rows.length} rows`);
@@ -320,8 +320,9 @@ router.get('/orders-in-shipment', async (req, res) => {
 router.get('/orders-in-truck', async (req, res) => {
     try {
         const query = `
-        select OrderID, StoreID, TruckID, AssistantID, DriverID
-        from order_details_with_latest_status where LatestStatus = 'InTruck';
+            select OrderID, StoreID, TruckID, AssistantID, DriverID
+            from order_details_with_latest_status
+            where LatestStatus = 'InTruck';
         `
 
 
@@ -337,8 +338,14 @@ router.get('/orders-in-truck', async (req, res) => {
 router.get('/attention-orders', async (req, res) => {
     try {
         const query = `
-            select OrderID, StoreCity, o.CustomerID, o.CustomerName, c.Contact as CustomerContact, LatestTimeStamp as TimeStamp
-            from order_details_with_latest_status o join customer c on o.CustomerID = c.CustomerID 
+            select OrderID,
+                   StoreCity,
+                   o.CustomerID,
+                   o.CustomerName,
+                   c.Contact       as CustomerContact,
+                   LatestTimeStamp as TimeStamp
+            from order_details_with_latest_status o
+                     join customer c on o.CustomerID = c.CustomerID
             where LatestStatus = 'Attention';
         `
 
@@ -348,6 +355,49 @@ router.get('/attention-orders', async (req, res) => {
     } catch (e) {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch attention orders'});
+    }
+});
+
+
+router.get('/store-data', async (req, res) => {
+    const query = `
+        select s.StoreID,
+               s.City,
+               COUNT(DISTINCT r.RouteID)     AS Routes,
+               COUNT(DISTINCT a.AssistantID) AS Assistants,
+               COUNT(DISTINCT d.DriverID)    AS Drivers,
+               COUNT(DISTINCT t.TruckID)     AS Trucks
+
+        from store s
+                 join route r on s.StoreID = r.StoreID
+                 join truck t on t.StoreID = s.StoreID
+                 join driver_details_with_employee d on d.StoreID = s.StoreID
+                 join assistant_details_with_employee a on a.StoreID = s.StoreID
+        group by s.StoreID;
+    `
+    try {
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch store data'});
+    }
+});
+
+router.get('/manager-data', async (req, res) => {
+    try {
+
+        const query = `
+            select e.StoreID, s.City, EmployeeID, Name, Contact, Address
+            from employee e
+                     join store s on e.StoreID = s.StoreID
+            where Type = 'StoreManager';
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+     } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch manager data'});
     }
 });
 

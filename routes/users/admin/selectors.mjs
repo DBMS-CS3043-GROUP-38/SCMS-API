@@ -61,4 +61,19 @@ router.get('/available-quarters/:year', async (req, res) => {
     }
 });
 
+router.get('/get-stores', async (req, res) => {
+    try {
+        const query = `
+            select StoreID, City
+            from store;
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: 'Failed to fetch stores'});
+    }
+});
+
+
 export default router;

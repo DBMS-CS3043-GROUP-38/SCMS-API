@@ -206,7 +206,6 @@ CREATE TABLE `Order_Tracking`
 );
 
 
-
 DELIMITER //
 # Triggers
 
@@ -296,53 +295,54 @@ END;
 # Views
 
 create view Driver_Details_With_Employee as
-    select d.DriverID,
-           d.EmployeeID,
-           e.Name,
-           e.Username,
-           e.Address,
-           e.Contact,
-           e.Type,
-           d.WorkingHours,
-           d.CompletedHours,
-           d.Status
-    from driver d
-             join employee e on d.EmployeeID = e.EmployeeID;
+select d.DriverID,
+       d.EmployeeID,
+       e.Name,
+       e.Username,
+       e.StoreID,
+       e.Address,
+       e.Contact,
+       e.Type,
+       d.WorkingHours,
+       d.CompletedHours,
+       d.Status
+from driver d
+         join employee e on d.EmployeeID = e.EmployeeID;
 //
 
 
 create view Assistant_Details_With_Employee as
-    select a.AssistantID,
-           a.EmployeeID,
-           e.Name,
-           e.Username,
-           e.Address,
-           e.Contact,
-           e.Type,
-           a.WorkingHours,
-           a.CompletedHours,
-           a.Status
-    from assistant a
-             join employee e on a.EmployeeID = e.EmployeeID;
+select a.AssistantID,
+       a.EmployeeID,
+       e.Name,
+       e.Username,
+       e.StoreID,
+       e.Address,
+       e.Contact,
+       e.Type,
+       a.WorkingHours,
+       a.CompletedHours,
+       a.Status
+from assistant a
+         join employee e on a.EmployeeID = e.EmployeeID;
 //
 
 
 create view truck_schedule_with_details as
-    select
-        ts.TruckScheduleID,
-        ts.StoreID,
-        ts.ShipmentID,
-        ts.ScheduleDateTime,
-        ts.RouteID,
-        ts.AssistantID,
-        ts.DriverID,
-        ts.TruckID,
-        ts.Hours,
-        ts.Status,
-        s.City as StoreCity,
-        a.Name as AssistantName,
-        d.Name as DriverName,
-        t.LicencePlate
+select ts.TruckScheduleID,
+       ts.StoreID,
+       ts.ShipmentID,
+       ts.ScheduleDateTime,
+       ts.RouteID,
+       ts.AssistantID,
+       ts.DriverID,
+       ts.TruckID,
+       ts.Hours,
+       ts.Status,
+       s.City as StoreCity,
+       a.Name as AssistantName,
+       d.Name as DriverName,
+       t.LicencePlate
 from truckschedule ts
          join truck t on ts.TruckID = t.TruckID
          join route r on ts.RouteID = r.RouteID
@@ -495,26 +495,21 @@ group by t.TruckID;
 
 # to get the daily store sales (sales on a date for each store)
 CREATE VIEW v_daily_store_sales AS
-SELECT 
-    s.StoreID,
-    s.City AS StoreCity,
-    DATE(o.OrderDate) AS SaleDate,
-    COUNT(o.OrderID) AS NumberOfOrders,
-    SUM(o.Value) AS TotalRevenue
-FROM 
-    `Order` o
-JOIN 
-    Route r ON o.RouteID = r.RouteID
-JOIN 
-    Store s ON r.StoreID = s.StoreID
-JOIN 
-    Order_Tracking ot ON o.OrderID = ot.OrderID
-WHERE 
-    ot.Status NOT IN ('Cancelled', 'Attention')
-GROUP BY 
-    s.StoreID, s.City, DATE(o.OrderDate)
-ORDER BY 
-    SaleDate DESC, TotalRevenue DESC
+SELECT s.StoreID,
+       s.City            AS StoreCity,
+       DATE(o.OrderDate) AS SaleDate,
+       COUNT(o.OrderID)  AS NumberOfOrders,
+       SUM(o.Value)      AS TotalRevenue
+FROM `Order` o
+         JOIN
+     Route r ON o.RouteID = r.RouteID
+         JOIN
+     Store s ON r.StoreID = s.StoreID
+         JOIN
+     Order_Tracking ot ON o.OrderID = ot.OrderID
+WHERE ot.Status NOT IN ('Cancelled', 'Attention')
+GROUP BY s.StoreID, s.City, DATE(o.OrderDate)
+ORDER BY SaleDate DESC, TotalRevenue DESC
 ;
 //
 

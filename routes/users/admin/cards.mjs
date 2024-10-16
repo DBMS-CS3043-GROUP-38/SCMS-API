@@ -149,7 +149,8 @@ router.get('/quarterly-store', async (req, res) => {
             where YEAR(CURDATE()) = YEAR(OrderDate)
               and QUARTER(CURDATE()) = QUARTER(OrderDate)
             group by StoreID
-            order by TotalRevenue desc limit 1;
+            order by TotalRevenue desc
+            limit 1;
         `
 
         const [rows] = await pool.query(query);
@@ -180,8 +181,100 @@ router.get('/best-customer', async (req, res) => {
         console.error(e);
         res.status(500).json({error: 'Failed to fetch best customer data'});
     }
-
-
 })
+
+router.get('/get-ready-shipments/:storeID', async (req, res) => {
+    try {
+        console.log(`Fetching ready shipments for store ${req.params.storeID}`);
+        const shipment = {'Ready': 0, 'NotReady': 0}
+        const query = `
+            select Status, count(s.ShipmentID) as shipmentCount
+            from shipment s
+                     join route r on s.RouteID = r.RouteID
+            where r.StoreID = ?
+            group by s.Status;
+        `
+        const [rows] = await pool.query(query, [req.params.storeID]);
+        rows.forEach(row => {
+            shipment[row.Status] = row.shipmentCount;
+        });
+        console.log(`Fetched ready shipments: ${JSON.stringify(shipment)}`);
+        res.json(shipment);
+    } catch (e) {
+        console.log(e)
+        res.status(500).json({error: 'Failed to fetch ready shipments'});
+    }
+});
+
+
+router.get('/get-available-assistants/:storeID', async (req, res) => {
+    try {
+        console.log(`Fetching available assistants for store ${req.params.storeID}`);
+        const assistants = {"Available": 0, "Busy": 0};
+        const query = `
+            select Status, COUNT(EmployeeID) as count
+            from assistant_details_with_employee
+            where StoreID = ?
+            group by Status;
+        `;
+
+
+        const [rows] = await pool.query(query, [req.params.storeID]);
+        rows.forEach(row => {
+            assistants[row.Status] = row.count;
+        });
+        console.log(`Fetched available assistants: ${JSON.stringify(assistants)}`);
+        res.json(assistants);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: 'Failed to fetch available assistants'});
+    }
+});
+
+router.get('/get-available-drivers/:storeID', async (req, res) => {
+   try {
+         console.log(`Fetching available drivers for store ${req.params.storeID}`);
+         const drivers = {"Available": 0, "Busy": 0};
+         const query = `
+                select Status, COUNT(EmployeeID) as count
+                from driver_details_with_employee
+                where StoreID = ?
+                group by Status;
+         `;
+
+         const [rows] = await pool.query(query, [req.params.storeID]);
+         rows.forEach(row => {
+              drivers[row.Status] = row.count;
+         });
+         console.log(`Fetched available drivers: ${JSON.stringify(drivers)}`);
+         res.json(drivers);
+   } catch (e) {
+       console.error(e);
+         res.status(500).json({error: 'Failed to fetch available drivers'});
+   }
+});
+
+router.get('/get-available-trucks/:storeID', async (req, res) => {
+    try {
+        console.log(`Fetching available trucks for store ${req.params.storeID}`);
+        const trucks = {"Available": 0, "Busy": 0};
+        const query = `
+            select Status, COUNT(TruckID) as count
+            from truck
+            where StoreID = ?
+            group by Status;
+        `;
+
+        const [rows] = await pool.query(query, [req.params.storeID]);
+        rows.forEach(row => {
+            trucks[row.Status] = row.count;
+        });
+        console.log(`Fetched available trucks: ${JSON.stringify(trucks)}`);
+        res.json(trucks);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: 'Failed to fetch available trucks'});
+    }
+});
 
 export default router;
