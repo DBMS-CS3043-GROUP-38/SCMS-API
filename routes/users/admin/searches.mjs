@@ -51,4 +51,66 @@ router.get('/order/:id', async (req, res) => {
     }
 });
 
+router.get('/customer', async (req, res) => {
+    const { by, term } = req.query;
+    let query = '';
+    let queryParams = [];
+
+    if (!by || !term) {
+        query = `
+            SELECT CustomerID AS 'Customer ID',
+                   Name AS 'Customer Name',
+                   City AS 'City',
+                   Contact AS 'Phone',
+                   Address AS 'Address',
+                   TotalRevenue AS 'Total Revenue',
+                   TotalOrders AS 'Total Orders'
+            FROM customer_report;
+        `;
+    } else {
+        switch (by) {
+            case 'name':
+                query = `
+                    SELECT CustomerID AS 'Customer ID',
+                           Name AS 'Customer Name',
+                           City AS 'City',
+                           Contact AS 'Phone',
+                           Address AS 'Address',
+                           TotalRevenue AS 'Total Revenue',
+                           TotalOrders AS 'Total Orders'
+                    FROM customer_report
+                    WHERE Name LIKE ?;
+                `;
+                queryParams = [`%${term}%`];
+                break;
+            case 'id':
+                query = `
+                    SELECT CustomerID AS 'Customer ID',
+                           Name AS 'Customer Name',
+                           City AS 'City',
+                           Contact AS 'Phone',
+                           Address AS 'Address',
+                           TotalRevenue AS 'Total Revenue',
+                           TotalOrders AS 'Total Orders'
+                    FROM customer_report
+                    WHERE CustomerID = ?;
+                `;
+                queryParams = [term];
+                break;
+            default:
+                res.status(400).json({ error: 'Invalid search parameter' });
+                return;
+        }
+    }
+
+    try {
+        const [rows] = await pool.query(query, queryParams);
+        res.json(rows);
+    } catch (error) {
+        console.error('Database query failed:', error);
+        res.status(500).json({ error: 'Database query failed' });
+    }
+});
+
+
 export default router;

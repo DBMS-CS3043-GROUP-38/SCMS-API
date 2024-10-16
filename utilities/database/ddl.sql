@@ -473,6 +473,7 @@ select c.CustomerID,
        c.Address,
        c.Type,
        c.City,
+       c.Contact,
        count(o.OrderID) as TotalOrders,
        sum(o.Value)     as TotalRevenue
 from Customer c

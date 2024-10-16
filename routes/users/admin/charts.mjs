@@ -85,4 +85,25 @@ router.get('/revenue-per-store/:year/:quarter', async (req, res) => {
     }
 });
 
+router.get('/customer-distribution', async (req, res) => {
+    try {
+        const customers = {"End": 0, "Retailer": 0}
+        const query = `
+            select Type, count(CustomerID) as count
+            from customer
+            group by Type;
+        `
+
+        const [rows] = await pool.query(query);
+        rows.forEach(row => {
+            customers[row.Type] = row.count;
+        });
+        console.log(`Fetched customer distribution: ${JSON.stringify(customers)}`);
+        res.json(customers);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch customer distribution'});
+    }
+});
+
 export default router;

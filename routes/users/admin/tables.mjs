@@ -162,7 +162,8 @@ router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
             from quarterly_product_report
             where Year = ${year}
               and Quarter = ${quarter}
-            order by revenue desc limit 100;
+            order by revenue desc
+            limit 100;
         `;
         const [rows] = await pool.query(query);
         res.json(rows);
@@ -187,7 +188,8 @@ router.get('/top-customers-quarter/:year/:quarter', async (req, res) => {
                     and LatestStatus not in ('Cancelled', 'Attention')) o
                      join customer c on o.CustomerID = c.CustomerID
             group by o.CustomerID
-            order by Revenue desc limit 100;
+            order by Revenue desc
+            limit 100;
         `;
         const [rows] = await pool.query(query);
         console.log(`Fetched top customers for ${year} Q${quarter}: ${rows.length} rows`);
@@ -395,9 +397,26 @@ router.get('/manager-data', async (req, res) => {
         `
         const [rows] = await pool.query(query);
         res.json(rows);
-     } catch (e) {
+    } catch (e) {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch manager data'});
+    }
+});
+
+router.get('/top-customers', async (req, res) => {
+    try {
+        const query = `
+            select CustomerID, Name, TotalOrders, TotalRevenue
+            from customer_report
+            order by TotalRevenue desc
+            limit 100;
+        `
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch top customers'});
     }
 });
 
