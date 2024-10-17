@@ -25,8 +25,13 @@ router.post('/schedule-orders', async (req, res) => {
     let message = '';
     try {
 
-        const [orders] = await pool.query(`select * from order_details_with_latest_status where LatestStatus = 'Pending'`);
-        const [trains] = await pool.query(`select * from train_schedule_with_destinations where Status = 'Not Completed' order by ScheduleDateTime`);
+        const [orders] = await pool.query(`select *
+                                           from order_details_with_latest_status
+                                           where LatestStatus = 'Pending'`);
+        const [trains] = await pool.query(`select *
+                                           from train_schedule_with_destinations
+                                           where Status = 'Not Completed'
+                                           order by ScheduleDateTime`);
         const TotalOrders = orders.length;
         const TotalTrains = trains.length;
 
@@ -37,7 +42,7 @@ router.post('/schedule-orders', async (req, res) => {
         //Looping through each order and assigning it to a train
         for (let i = 0; i < TotalOrders; i++) {
             console.log(`Processing order ${orders[i].OrderID} with volume ${orders[i].TotalVolume}`);
-            for(let j = 0; j < TotalTrains; j++) {
+            for (let j = 0; j < TotalTrains; j++) {
                 //Break if train is not to destination
                 if (orders[i].StoreCity !== trains[j].StoreCity) {
                     console.log(`Order ${orders[i].OrderID} is not for train ${trains[j].TrainScheduleID}`);
@@ -82,13 +87,17 @@ router.post('/dispatch-train/:trainID', async (req, res) => {
     console.log(`Dispatching train ${trainID}`);
     try {
         const getOrders = `
-            select OrderID from train_contains where TrainScheduleID = ${trainID};
+            select OrderID
+            from train_contains
+            where TrainScheduleID = ${trainID};
         `;
         const setOrderStatus = `
-        insert into order_tracking(OrderID, TimeStamp, Status) VALUE (?, now(), 'InTrain');
+            insert into order_tracking(OrderID, TimeStamp, Status) VALUE (?, now(), 'InTrain');
         `;
         const setTrainStatus = `
-        update trainschedule set Status = 'In Progress' where TrainScheduleID = ${trainID};
+            update trainschedule
+            set Status = 'In Progress'
+            where TrainScheduleID = ${trainID};
         `;
 
         const [orders] = await pool.query(getOrders);
@@ -109,5 +118,81 @@ router.post('/dispatch-train/:trainID', async (req, res) => {
         res.status(500).json({error: 'Failed to dispatch train'});
     }
 });
+
+
+router.patch('/report-order/:orderID', async (req, res) => {
+    try {
+        let message = '';
+        const {orderID} = req.params;
+        const orderInfo = `
+            select TotalVolume, ShipmentID, TrainScheduleID
+            from order_details_with_latest_status
+            where OrderID = ${orderID}
+              and LatestStatus not in ('Attention', 'Delivered', 'Cancelled');
+        `;
+        const tracking =
+            `            insert into order_tracking (OrderID, TimeStamp, Status) value (${orderID}, now(), 'Attention');
+            `;
+        const removeTrain =
+            `delete
+             from train_contains
+             where OrderID = ${orderID};`
+        ;
+        const removeShipment =
+            `delete
+             from shipment_contains
+             where OrderID = ${orderID};`
+        ;
+        const updateSpaceTrain =
+            `update trainschedule
+             set FilledCapacity = FilledCapacity - ?
+             where TrainScheduleID = ?;`;
+
+        const updateSpaceShipment =
+            `update shipment
+             set FilledCapacity = FilledCapacity - ?
+             where ShipmentID = ?;`;
+
+
+        const [rows] = await pool.query(orderInfo);
+        if (rows.length === 0) {
+            return res.json({message: 'Order not found'});
+        }
+        if (rows[0].TrainScheduleID !== null) {
+            await pool.query(updateSpaceTrain, [rows[0].TotalVolume, rows[0].TrainScheduleID]);
+            await pool.query(removeTrain);
+            message = message + 'Order removed from train \n';
+        }
+        if (rows[0].ShipmentID !== null) {
+            await pool.query(updateSpaceShipment, [rows[0].TotalVolume, rows[0].ShipmentID]);
+            await pool.query(removeShipment);
+            message = message + 'Order removed from shipment \n';
+        }
+        await pool.query(tracking);
+        message = message + 'Order status changed to Attention';
+        res.json({message});
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: 'Failed to update order status'});
+    }
+});
+
+
+router.patch('/cancel-order/:orderID', async (req, res) => {
+        try {
+            const {orderID} = req.params;
+            const query = `
+                insert into order_tracking (OrderID, TimeStamp, Status) value (?, now(), 'Cancelled');
+            `;
+
+            await pool.query(query, [orderID]);
+            res.json({message: `Order ${orderID} cancelled successfully}`});
+        } catch (e) {
+            console.error(e);
+            res.status(500).json({error: 'Failed to cancel order'});
+        }
+    }
+)
+;
 
 export default router;

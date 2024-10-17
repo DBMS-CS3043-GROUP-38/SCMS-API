@@ -29,8 +29,8 @@ CREATE TABLE `Driver`
 (
     `DriverID`       INT AUTO_INCREMENT,
     `EmployeeID`     INT NOT NULL,
-    `WorkingHours`   INT,
-    `CompletedHours` INT,
+    `WorkingHours`   TIME,
+    `CompletedHours` TIME,
     `Status`         ENUM ('Available', 'Busy'),
     PRIMARY KEY (`DriverID`),
     FOREIGN KEY (`EmployeeID`) REFERENCES `Employee` (`EmployeeID`)
@@ -40,8 +40,8 @@ CREATE TABLE `Assistant`
 (
     `AssistantID`    INT AUTO_INCREMENT,
     `EmployeeID`     INT NOT NULL,
-    `WorkingHours`   INT,
-    `CompletedHours` INT,
+    `WorkingHours`   TIME,
+    `CompletedHours` TIME,
     `Status`         ENUM ('Available', 'Busy'),
     PRIMARY KEY (`AssistantID`),
     FOREIGN KEY (`EmployeeID`) REFERENCES `Employee` (`EmployeeID`)
@@ -206,11 +206,11 @@ CREATE TABLE `Order_Tracking`
 );
 
 
+
+DELIMITER //
 # Triggers
 
 # Remember to comment this trigger when running order creation script
-DELIMITER //
-
 CREATE TRIGGER after_order_insert
     AFTER INSERT
     ON `Order`
@@ -295,6 +295,63 @@ END;
 
 # Views
 
+create view Driver_Details_With_Employee as
+    select d.DriverID,
+           d.EmployeeID,
+           e.Name,
+           e.Username,
+           e.Address,
+           e.Contact,
+           e.Type,
+           d.WorkingHours,
+           d.CompletedHours,
+           d.Status
+    from driver d
+             join employee e on d.EmployeeID = e.EmployeeID;
+//
+
+
+create view Assistant_Details_With_Employee as
+    select a.AssistantID,
+           a.EmployeeID,
+           e.Name,
+           e.Username,
+           e.Address,
+           e.Contact,
+           e.Type,
+           a.WorkingHours,
+           a.CompletedHours,
+           a.Status
+    from assistant a
+             join employee e on a.EmployeeID = e.EmployeeID;
+//
+
+
+create view truck_schedule_with_details as
+    select
+        ts.TruckScheduleID,
+        ts.StoreID,
+        ts.ShipmentID,
+        ts.ScheduleDateTime,
+        ts.RouteID,
+        ts.AssistantID,
+        ts.DriverID,
+        ts.TruckID,
+        ts.Hours,
+        ts.Status,
+        s.City as StoreCity,
+        a.Name as AssistantName,
+        d.Name as DriverName,
+        t.LicencePlate
+from truckschedule ts
+         join truck t on ts.TruckID = t.TruckID
+         join route r on ts.RouteID = r.RouteID
+         join store s on t.StoreID = s.StoreID
+         join driver_details_with_employee d on ts.DriverID = d.DriverID
+         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID;
+
+
+# To get the order details with the latest status and some more details
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
        o.CustomerID,
@@ -303,6 +360,7 @@ SELECT o.OrderID,
        o.Value,
        o.TotalVolume,
        o.OrderDate,
+       tc.TrainScheduleID,
        r.StoreID,
        s.City       AS StoreCity,
        o.RouteID,
@@ -332,19 +390,17 @@ FROM `Order` o
       GROUP BY OrderID) AS latest ON ot.OrderID = latest.OrderID AND ot.TimeStamp = latest.LatestTimeStamp
          join customer c on o.CustomerID = c.CustomerID
          left outer join shipment_contains sc on o.OrderID = sc.OrderID
-         left outer join truckschedule ts on sc.ShipmentID = ts.ShipmentID
          left outer join shipment sh on sc.ShipmentID = sh.ShipmentID
-         left outer join (select Truck.TruckID, Truck.LicencePlate
-                          from truckschedule
-                                   join truck on truckschedule.TruckID = truck.TruckID) t on ts.TruckID = t.TruckID
-         left outer join (select AssistantID, employee.Name
-                          from assistant
-                                   join employee on assistant.EmployeeID = employee.EmployeeID) a
+         left outer join truckschedule ts on sh.ShipmentID = ts.ShipmentID
+         left outer join truck t on ts.TruckID = t.TruckID
+         left outer join assistant_details_with_employee a
                          on ts.AssistantID = a.AssistantID
          left outer join (select DriverID, employee.Name
                           from driver
                                    join employee on driver.EmployeeID = employee.EmployeeID) d
-                         on ts.DriverID = d.DriverID;
+                         on ts.DriverID = d.DriverID
+         left outer join train_contains tc on tc.OrderID = o.OrderID;
+;
 //
 
 CREATE VIEW Quarterly_Product_Report AS
@@ -437,11 +493,35 @@ where ts.Status = 'Completed'
 group by t.TruckID;
 //
 
+# to get the daily store sales (sales on a date for each store)
+CREATE VIEW v_daily_store_sales AS
+SELECT 
+    s.StoreID,
+    s.City AS StoreCity,
+    DATE(o.OrderDate) AS SaleDate,
+    COUNT(o.OrderID) AS NumberOfOrders,
+    SUM(o.Value) AS TotalRevenue
+FROM 
+    `Order` o
+JOIN 
+    Route r ON o.RouteID = r.RouteID
+JOIN 
+    Store s ON r.StoreID = s.StoreID
+JOIN 
+    Order_Tracking ot ON o.OrderID = ot.OrderID
+WHERE 
+    ot.Status NOT IN ('Cancelled', 'Attention')
+GROUP BY 
+    s.StoreID, s.City, DATE(o.OrderDate)
+ORDER BY 
+    SaleDate DESC, TotalRevenue DESC
+;
+//
 
 # Functions
 
--- This function adds future train schedules for the next 30 days
--- These two functions will be implemented in the back end later. They are here for testing purposes
+-- This function adds future train schedules for the next 7 days
+-- These two functions might be implemented in the back end later.
 CREATE FUNCTION AddFutureTrains()
     RETURNS INT
     DETERMINISTIC
@@ -463,73 +543,7 @@ BEGIN
 
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
-    -- Set the end date to 30 days from now
-    SET end_date = DATE_ADD(CURDATE(), INTERVAL 30 DAY);
-
-    -- Set the start date to the last scheduled date or today
-    SELECT COALESCE(MAX(DATE(ScheduleDateTime)), CURDATE())
-    INTO start_date
-    FROM TrainSchedule
-    WHERE ScheduleDateTime >= CURDATE();
-
-
-    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
-    IF start_date >= end_date THEN
-        RETURN 0;
-    END IF;
-
-    -- Loop through each train
-    OPEN train_cursor;
-    read_loop:
-    LOOP
-        FETCH train_cursor INTO train_id, full_capacity, store_id, train_time, train_day;
-        IF done THEN
-            LEAVE read_loop;
-        END IF;
-
-        -- Add schedules for this train
-        SET date_ptr = start_date;
-        WHILE date_ptr <= end_date
-            DO
-                IF DAYNAME(date_ptr) = train_day THEN
-                    INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
-                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
-                    SET schedules_added = schedules_added + 1;
-                END IF;
-                SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
-            END WHILE;
-    END LOOP;
-
-    CLOSE train_cursor;
-
-    RETURN schedules_added;
-END;
-//
-
-
--- This function adds future train schedules for the next 7 days only for testing purposes
-CREATE FUNCTION AddFutureTrainsTest()
-    RETURNS INT
-    DETERMINISTIC
-BEGIN
-    DECLARE end_date DATE;
-    DECLARE start_date DATE;
-    DECLARE done INT DEFAULT FALSE;
-    DECLARE train_id INT;
-    DECLARE full_capacity DECIMAL(10, 2);
-    DECLARE store_id INT;
-    DECLARE train_time TIME;
-    DECLARE train_day ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
-    DECLARE schedules_added INT DEFAULT 0;
-    DECLARE date_ptr DATE;
-
-    DECLARE train_cursor CURSOR FOR
-        SELECT TrainID, FullCapacity, StoreID, Time, Day
-        FROM Train;
-
-    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
-
-    -- Set the end date to 30 days from now
+    -- Set the end date to 7 days from now
     SET end_date = DATE_ADD(CURDATE(), INTERVAL 7 DAY);
 
     -- Set the start date to the last scheduled date or today
@@ -538,11 +552,8 @@ BEGIN
     FROM TrainSchedule
     WHERE ScheduleDateTime >= CURDATE();
 
-#     -- Decrease 1 day from start date
-#     SET start_date = DATE_SUB(start_date, INTERVAL 1 DAY);
 
-
-    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 30 DAYS
+    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 7 DAYS
     IF start_date >= end_date THEN
         RETURN 0;
     END IF;
@@ -575,102 +586,6 @@ BEGIN
 END;
 //
 
-DELIMITER ;
-
-
--- Insert dummy data into Order table
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (45, 150.75, '2024-10-01', '2024-10-05', 3, 75.50);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (112, 240.50, '2024-10-02', '2024-10-07', 5, 120.00);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (600, 180.00, '2024-10-03', '2024-10-09', 2, 90.25);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (850, 320.99, '2024-10-04', '2024-10-10', 4, 150.50);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (70, 400.25, '2024-10-05', '2024-10-12', 1, 200.75);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (230, 520.00, '2024-10-06', '2024-10-15', 6, 250.00);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (715, 250.00, '2024-10-07', '2024-10-14', 3, 125.00);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (910, 300.50, '2024-10-08', '2024-10-16', 5, 135.50);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (356, 600.80, '2024-10-09', '2024-10-20', 2, 300.40);
-
-INSERT INTO `Order` (CustomerID, Value, OrderDate, DeliveryDate, RouteID, TotalVolume)
-VALUES (421, 720.00, '2024-10-10', '2024-10-22', 4, 360.00);
-
-
--- View to see completed work hours for drivers and assistants in the current month
-CREATE VIEW WorkHours_CurrentMonth AS
-SELECT 
-    'Driver' AS Role,
-    D.EmployeeID,
-    E.Name,
-    D.CompletedHours
-FROM Driver D
-JOIN Employee E ON D.EmployeeID = E.EmployeeID
-WHERE MONTH(CURRENT_DATE()) = MONTH(CURDATE()) AND YEAR(CURRENT_DATE()) = YEAR(CURDATE())
-    
-UNION ALL
-
-SELECT 
-    'Assistant' AS Role,
-    A.EmployeeID,
-    E.Name,
-    A.CompletedHours
-FROM Assistant A
-JOIN Employee E ON A.EmployeeID = E.EmployeeID
-WHERE MONTH(CURRENT_DATE()) = MONTH(CURDATE()) AND YEAR(CURRENT_DATE()) = YEAR(CURDATE());
-
-
--- Insert dummy data into Shipment table to check the Distance driven view works
-
-INSERT INTO Shipment (CreatedDate, Capacity, RouteID, FilledCapacity, Status)
-VALUES 
--- Shipment #1
-('2024-10-15', 500.00, 1, 450.00, 'Ready'),
-
--- Shipment #2
-('2024-10-14', 750.00, 2, 600.00, 'NotReady'),
-
--- Shipment #3
-('2024-10-13', 1000.00, 3, 1000.00, 'Completed'),
-
--- Shipment #4
-('2024-10-12', 600.00, 4, 400.00, 'Ready'),
-
--- Shipment #5
-('2024-10-11', 1200.00, 5, 1150.00, 'Completed');
-
-
--- Insert dummy data into TruckSchedule table
-
-INSERT INTO TruckSchedule (StoreID, ShipmentID, ScheduleDateTime, RouteID, AssistantID, DriverID, TruckID, Hours, Status)
-VALUES 
--- Truck Schedule #1
-(1, 1, '2024-10-15 08:00:00', 1, 1, 1, 1, '08:00:00', 'In Progress'),
-
--- Truck Schedule #2
-(2, 2, '2024-10-16 09:00:00', 2, 2, 2, 2, '07:30:00', 'Not Completed'),
-
--- Truck Schedule #3
-(3, 3, '2024-10-17 07:30:00', 3, 3, 3, 3, '09:00:00', 'Completed'),
-
--- Truck Schedule #4
-(4, 4, '2024-10-18 10:00:00', 4, 4, 4, 4, '06:00:00', 'In Progress'),
-
--- Truck Schedule #5
-(5, 5, '2024-10-19 11:00:00', 5, 5, 5, 5, '08:30:00', 'Not Completed');
 
 
 --View for truck distances
@@ -686,10 +601,11 @@ WHERE
     ts.Status = 'Completed'
 GROUP BY
     ts.TruckID;
+//
 
 
 -- Trigger to check and update remaining capacity of shipment when adding orders
-DELIMITER //
+
 
 CREATE TRIGGER check_shipment_capacity BEFORE INSERT ON Shipment_contains
 FOR EACH ROW
@@ -719,13 +635,8 @@ BEGIN
     END IF;
 END //
 
-DELIMITER ;
-
-
 
 -- Trigger to check work hours for driver and assistant when creating a truck schedule
-DELIMITER //
-
 CREATE TRIGGER check_schedule_work_hours BEFORE INSERT ON TruckSchedule
 FOR EACH ROW
 BEGIN

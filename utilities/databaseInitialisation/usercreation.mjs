@@ -9,7 +9,7 @@ const hashCountEnv = process.env.HASH_COUNT;
 const hashCount = hashCountEnv ? parseInt(hashCountEnv) : 10;
 
 async function createEmployee(data) {
-    const {name, username, address, password, StoreID, type, contact} = data;
+    const { name, username, address, password, StoreID, type, contact } = data;
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
         const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID, Contact) VALUES (?, ?, ?, ?, ?, ?, ?)`;
@@ -17,18 +17,23 @@ async function createEmployee(data) {
 
         const id = result.insertId;
 
+        // Set the WorkingHours and CompletedHours in the TIME format as 'HH:MM:SS'
+        const defaultWorkingHours = type === 'Driver' ? '40:00:00' : '60:00:00';
+        const completedHours = '00:00:00';
+
         if (type === 'Driver') {
-            const driverQuery = `INSERT INTO Driver (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, 40, 0, 'Available')`;
-            await pool.query(driverQuery, [id]);
+            const driverQuery = `INSERT INTO Driver (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, ?, ?, 'Available')`;
+            await pool.query(driverQuery, [id, defaultWorkingHours, completedHours]);
         } else if (type === 'Assistant') {
-            const assistantQuery = `INSERT INTO Assistant (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, 60, 0, 'Available')`;
-            await pool.query(assistantQuery, [id]);
+            const assistantQuery = `INSERT INTO Assistant (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, ?, ?, 'Available')`;
+            await pool.query(assistantQuery, [id, defaultWorkingHours, completedHours]);
         }
         console.log(`Employee ${name} created successfully: username - ${username}, type - ${type}`);
     } catch (error) {
         console.log(error);
     }
 }
+
 
 async function createCustomer(data) {
     const {name, username, address, password, type, city, contact} = data;
@@ -82,7 +87,7 @@ async function userCreation(cities) {
 
     //Generate Drivers and Assistants for each store
     for (let i = 1; i <= cities.length; i++) {
-        const DriverCount = Math.floor(Math.random() * 20) + 1;
+        const DriverCount = Math.floor(Math.random() * 15) + 5;
         for (let j = 0; j < DriverCount; j++) {
             const name = faker.person.fullName();
             const randomNumber = Math.floor(Math.random() * 1000);
@@ -100,7 +105,7 @@ async function userCreation(cities) {
             await createEmployee(data);
         }
 
-        const AssistantCount = Math.floor(Math.random() * 20) + DriverCount;
+        const AssistantCount = Math.floor(Math.random() * 10) + DriverCount;
         for (let j = 0; j < AssistantCount; j++) {
             const name = faker.person.fullName();
             const randomNumber = Math.floor(Math.random() * 1000);
