@@ -588,7 +588,7 @@ END;
 
 
 
---View for truck distances
+# View for truck distances
 
 CREATE VIEW Truck_Distances AS
 SELECT 
