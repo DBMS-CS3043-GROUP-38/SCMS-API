@@ -29,8 +29,8 @@ CREATE TABLE `Driver`
 (
     `DriverID`       INT AUTO_INCREMENT,
     `EmployeeID`     INT NOT NULL,
-    `WorkingHours`   INT,
-    `CompletedHours` INT,
+    `WorkingHours`   TIME,
+    `CompletedHours` TIME,
     `Status`         ENUM ('Available', 'Busy'),
     PRIMARY KEY (`DriverID`),
     FOREIGN KEY (`EmployeeID`) REFERENCES `Employee` (`EmployeeID`)
@@ -40,8 +40,8 @@ CREATE TABLE `Assistant`
 (
     `AssistantID`    INT AUTO_INCREMENT,
     `EmployeeID`     INT NOT NULL,
-    `WorkingHours`   INT,
-    `CompletedHours` INT,
+    `WorkingHours`   TIME,
+    `CompletedHours` TIME,
     `Status`         ENUM ('Available', 'Busy'),
     PRIMARY KEY (`AssistantID`),
     FOREIGN KEY (`EmployeeID`) REFERENCES `Employee` (`EmployeeID`)
