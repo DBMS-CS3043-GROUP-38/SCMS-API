@@ -12,17 +12,24 @@ async function createEmployee(data) {
     const {name, username, address, password, StoreID, type, contact} = data;
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
-        const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID, Contact) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID, Contact)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)`;
         const [result] = await pool.query(query, [name, username, address, hashedPassword, type, StoreID, contact]);
 
         const id = result.insertId;
 
+        // Set the WorkingHours and CompletedHours in the TIME format as 'HH:MM:SS'
+        const defaultWorkingHours = type === 'Driver' ? '40:00:00' : '60:00:00';
+        const completedHours = '00:00:00';
+
         if (type === 'Driver') {
-            const driverQuery = `INSERT INTO Driver (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, 40, 0, 'Available')`;
-            await pool.query(driverQuery, [id]);
+            const driverQuery = `INSERT INTO Driver (EmployeeID, WorkingHours, CompletedHours, Status)
+                                 VALUES (?, ?, ?, 'Available')`;
+            await pool.query(driverQuery, [id, defaultWorkingHours, completedHours]);
         } else if (type === 'Assistant') {
-            const assistantQuery = `INSERT INTO Assistant (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, 60, 0, 'Available')`;
-            await pool.query(assistantQuery, [id]);
+            const assistantQuery = `INSERT INTO Assistant (EmployeeID, WorkingHours, CompletedHours, Status)
+                                    VALUES (?, ?, ?, 'Available')`;
+            await pool.query(assistantQuery, [id, defaultWorkingHours, completedHours]);
         }
         console.log(`Employee ${name} created successfully: username - ${username}, type - ${type}`);
     } catch (error) {
@@ -30,12 +37,14 @@ async function createEmployee(data) {
     }
 }
 
+
 async function createCustomer(data) {
     const {name, username, address, password, type, city, contact} = data;
 
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
-        const query = `INSERT INTO customer (Username, Name, Address, Type, City, PasswordHash, Contact) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const query = `INSERT INTO customer (Username, Name, Address, Type, City, PasswordHash, Contact)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)`;
         await pool.query(query, [username, name, address, type, city, hashedPassword, contact]);
         console.log(`Customer ${name} created successfully: username - ${username}, city - ${city}`);
     } catch (error) {

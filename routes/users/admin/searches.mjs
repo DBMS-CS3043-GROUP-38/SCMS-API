@@ -112,5 +112,163 @@ router.get('/customer', async (req, res) => {
     }
 });
 
+router.get('/driver', async (req, res) => {
+    const { by, term } = req.query;
+    let query = '';
+    let queryParams = [];
+
+    if (!by || !term) {
+        query = `
+            select DriverID       AS 'Driver ID',
+                   Name           AS 'Driver Name',
+                   StoreID        AS 'Store ID',
+                   Contact        AS 'Phone',
+                   Status         AS 'Availability',
+                   CompletedHours AS 'CompletedHours',
+                   WorkingHours   AS 'WorkHours'
+            from driver_details_with_employee;
+        `;
+    } else {
+        switch (by) {
+            case 'name':
+                query = `
+                    select DriverID       AS 'Driver ID',
+                           Name           AS 'Driver Name',
+                           StoreID        AS 'Store ID',
+                           Contact        AS 'Phone',
+                           Status         AS 'Availability',
+                           CompletedHours AS 'CompletedHours',
+                           WorkingHours   AS 'WorkHours'
+                    from driver_details_with_employee where Name LIKE ?;
+                `;
+                queryParams = [`%${term}%`];
+                break;
+            case 'id':
+                query = `
+                    select DriverID       AS 'Driver ID',
+                            Name           AS 'Driver Name',
+                            StoreID        AS 'Store ID',
+                            Contact        AS 'Phone',
+                            Status         AS 'Availability',
+                            CompletedHours AS 'CompletedHours',
+                            WorkingHours   AS 'WorkHours'
+                    from driver_details_with_employee where DriverID = ?;
+                `;
+                queryParams = [term];
+                break;
+            default:
+                res.status(400).json({ error: 'Invalid search parameter' });
+                return;
+        }
+    }
+    try {
+        const [rows] = await pool.query(query, queryParams);
+        res.json(rows);
+    } catch (error) {
+        console.error('Database query failed:', error);
+        res.status(500).json({ error: 'Database query failed' });
+    }
+});
+
+router.get('/assistant', async (req, res) => {
+    const { by, term } = req.query;
+    let query = '';
+    let queryParams = [];
+
+    if (!by || !term) {
+        query = `
+            select AssistantID       AS 'Assistant ID',
+                   Name             AS 'Assistant Name',
+                   StoreID          AS 'Store ID',
+                   Contact          AS 'Phone',
+                   Status           AS 'Availability',
+                   CompletedHours   AS 'CompletedHours',
+                   WorkingHours     AS 'WorkHours'
+            from assistant_details_with_employee;
+        `;
+    } else {
+        switch (by) {
+            case 'name':
+                query = `
+                    select AssistantID       AS 'Assistant ID',
+                           Name             AS 'Assistant Name',
+                           StoreID          AS 'Store ID',
+                           Contact          AS 'Phone',
+                           Status           AS 'Availability',
+                           CompletedHours   AS 'CompletedHours',
+                           WorkingHours     AS 'WorkHours'
+                    from assistant_details_with_employee where Name LIKE ?;
+                `;
+                queryParams = [`%${term}%`];
+                break;
+            case 'id':
+                query = `
+                    select AssistantID       AS 'Assistant ID',
+                           Name             AS 'Assistant Name',
+                           StoreID          AS 'Store ID',
+                           Contact          AS 'Phone',
+                           Status           AS 'Availability',
+                           CompletedHours   AS 'CompletedHours',
+                           WorkingHours     AS 'WorkHours'
+                    from assistant_details_with_employee where AssistantID = ?;
+                `;
+                queryParams = [term];
+                break;
+            default:
+                res.status(400).json({ error: 'Invalid search parameter' });
+                return;
+        }
+    }
+    try {
+        const [rows] = await pool.query(query, queryParams);
+        res.json(rows);
+    } catch (error) {
+        console.error('Database query failed:', error);
+        res.status(500).json({ error: 'Database query failed' });
+    }
+});
+
+router.get('/route', async (req, res) => {
+    const {by, term} = req.query;
+    let query = '';
+    let queryParams = [];
+
+    if (!by || !term) {
+        query = `
+            select RouteID       AS 'Route ID',
+                   StoreID       AS 'Store ID',
+                   Distance      AS 'Distance(KM)',
+                   Time_duration AS 'Time Duration',
+                   Description   AS 'Description'
+            from route;
+        `;
+    } else {
+        switch (by) {
+            case 'id':
+                query = `
+                    select RouteID       AS 'Route ID',
+                           StoreID       AS 'Store ID',
+                           Distance      AS 'Distance(KM)',
+                           Time_duration AS 'Time Duration',
+                           Description   AS 'Description'
+                    from route
+                    where RouteID = ?;
+                `;
+                queryParams = [term];
+                break;
+            default:
+                res.status(400).json({error: 'Invalid search parameter'});
+                return;
+        }
+    }
+    try {
+        const [rows] = await pool.query(query, queryParams);
+        res.json(rows);
+    } catch (error) {
+        console.error('Database query failed:', error);
+        res.status(500).json({error: 'Database query failed'});
+    }
+})
+
 
 export default router;
