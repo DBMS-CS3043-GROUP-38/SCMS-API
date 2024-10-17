@@ -582,5 +582,21 @@ BEGIN
 END;
 //
 
+# View for truck distances
+
+CREATE VIEW Truck_Distances AS
+SELECT
+    ts.TruckID,
+    SUM(r.Distance) AS TotalDistance
+FROM
+    TruckSchedule ts
+        JOIN Route r ON ts.RouteID = r.RouteID
+WHERE
+    ts.Status = 'Completed'
+GROUP BY
+    ts.TruckID;
+//
+
+
 
 DELIMITER ;
