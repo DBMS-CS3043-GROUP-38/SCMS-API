@@ -587,4 +587,87 @@ END;
 //
 
 
+
+--View for truck distances
+
+CREATE VIEW Truck_Distances AS
+SELECT 
+    ts.TruckID,
+    SUM(r.Distance) AS TotalDistance
+FROM
+    TruckSchedule ts
+    JOIN Route r ON ts.RouteID = r.RouteID
+WHERE
+    ts.Status = 'Completed'
+GROUP BY
+    ts.TruckID;
+//
+
+
+-- Trigger to check and update remaining capacity of shipment when adding orders
+
+
+CREATE TRIGGER check_shipment_capacity BEFORE INSERT ON Shipment_contains
+FOR EACH ROW
+BEGIN
+    DECLARE shipmentCapacity DECIMAL(10, 2);
+    DECLARE filledCapacity DECIMAL(10, 2);
+    DECLARE orderVolume DECIMAL(10, 2);
+
+    -- Get the shipment's capacity and filled capacity
+    SELECT Capacity, FilledCapacity INTO shipmentCapacity, filledCapacity 
+    FROM Shipment 
+    WHERE ShipmentID = NEW.ShipmentID;
+
+    -- Get the total volume of the order being added
+    SELECT TotalVolume INTO orderVolume 
+    FROM `Order` 
+    WHERE OrderID = NEW.OrderID;
+
+    -- Check if adding the order would exceed the capacity
+    IF (filledCapacity + orderVolume) > shipmentCapacity THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Adding this order exceeds the shipment capacity';
+    ELSE
+        -- Update the filled capacity
+        UPDATE Shipment
+        SET FilledCapacity = filledCapacity + orderVolume
+        WHERE ShipmentID = NEW.ShipmentID;
+    END IF;
+END //
+
+
+-- Trigger to check work hours for driver and assistant when creating a truck schedule
+CREATE TRIGGER check_schedule_work_hours BEFORE INSERT ON TruckSchedule
+FOR EACH ROW
+BEGIN
+    DECLARE driverWorkingHours INT;
+    DECLARE driverCompletedHours INT;
+    DECLARE assistantWorkingHours INT;
+    DECLARE assistantCompletedHours INT;
+    DECLARE scheduleHours TIME;
+
+    -- Get working and completed hours for the driver
+    SELECT WorkingHours, CompletedHours INTO driverWorkingHours, driverCompletedHours
+    FROM Driver
+    WHERE DriverID = NEW.DriverID;
+
+    -- Get working and completed hours for the assistant
+    SELECT WorkingHours, CompletedHours INTO assistantWorkingHours, assistantCompletedHours
+    FROM Assistant
+    WHERE AssistantID = NEW.AssistantID;
+
+    -- Get the hours for the schedule
+    SET scheduleHours = NEW.Hours;
+
+    -- Check if the driver's hours exceed
+    IF (driverCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > driverWorkingHours THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds driver\'s available work hours';
+    END IF;
+
+    -- Check if the assistant's hours exceed
+    IF (assistantCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > assistantWorkingHours THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds assistant\'s available work hours';
+    END IF;
+END //
+
 DELIMITER ;
