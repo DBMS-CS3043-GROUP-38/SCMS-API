@@ -14,10 +14,10 @@ router.use(session({
     resave: false,
     saveUninitialized: true,
     cookie: {
-        secure: false
+        secure: true,
+        httpOnly: true,
     }
 }));
-
 router.use(passport.initialize());
 router.use(passport.session());
 
@@ -42,6 +42,7 @@ const checkAuth = (req, res, next) => {
     if (req.isAuthenticated()) {
         return next();
     }
+    console.log('User not authenticated');
     res.status(401).send('You need to log in.');
 };
 
@@ -55,10 +56,23 @@ const checkAdmin = (req, res, next) => {
 router.use('/admin', checkAuth, checkAdmin, adminRoutes);
 
 
-router.get('/login', passport.authenticate('local', {
-    successRedirect: '/admin',
-    failureRedirect: '/login',
-    failureFlash: true
-}));
+router.post('/login', async (req, res, next) => {
+    passport.authenticate('local', (err, user, info) => {
+        if (err) {
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid username or password' });
+        }
+
+        req.logIn(user, (err) => {
+            if (err) {
+                return res.status(500).json({ message: 'Internal server error' });
+            }
+            // Successful login, send a success response
+            return res.status(200).json({ message: 'Login successful',type: user.Type });
+        });
+    })(req, res, next);
+});
 
 export default router;

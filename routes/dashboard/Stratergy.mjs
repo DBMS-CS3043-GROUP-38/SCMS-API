@@ -3,15 +3,18 @@ import { Strategy } from 'passport-local';
 import pool from "../../utilities/database/db.mjs";
 import bcrypt from 'bcrypt';
 
+
 // Local Strategy
 passport.use(new Strategy(async (username, password, done) => {
     try {
+        console.log('Authenticating user');
         const [rows] = await pool.query('SELECT * FROM employee WHERE Username = ?', [username]);
         const user = rows[0];
-        if (!user) return done(null, false, { message: 'Incorrect username.' });
+        if (!user) return done(null, false);
 
+        // Check if the password is valid
         const isValidPassword = await bcrypt.compare(password, user.PasswordHash);
-        if (!isValidPassword) return done(null, false, { message: 'Incorrect password.' });
+        if (!isValidPassword) return done(null, false);
 
         return done(null, user);  // Authenticated user
     } catch (error) {
