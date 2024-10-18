@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import adminRoutes from './routes/users/admin/admin.mjs';
+// import dashboardRoutes from './routes/dashboard/dashboard.mjs';
 
 dotenv.config();
 
@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/admin', adminRoutes);
+// app.use('/dashboard', dashboardRoutes);
 
 app.get('/test', (req, res) => {
     res.send('Server is working');
