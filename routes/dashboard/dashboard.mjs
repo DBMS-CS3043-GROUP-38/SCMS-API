@@ -4,10 +4,16 @@ import dotenv from "dotenv";
 import passport from '../dashboard/Stratergy.mjs';
 import pool from '../../utilities/database/db.mjs';
 import adminRoutes from '../users/admin/admin.mjs';
-
+import cors from "cors";
 
 dotenv.config();
 const router = express.Router();
+router.use(cors(
+    {
+        origin: 'http://localhost:3000',
+        credentials: true
+    }
+));
 
 router.use(session({
     secret: process.env.SESSION_SECRET,
@@ -42,7 +48,6 @@ const checkAuth = (req, res, next) => {
     if (req.isAuthenticated()) {
         return next();
     }
-    console.log('User not authenticated');
     res.status(401).send('You need to log in.');
 };
 
@@ -70,7 +75,20 @@ router.post('/login', async (req, res, next) => {
                 return res.status(500).json({ message: 'Internal server error' });
             }
             // Successful login, send a success response
-            return res.status(200).json({ message: 'Login successful',type: user.Type });
+            if (user.Type === 'Admin') {
+                return res.status(200).json({
+                    type: user.Type,
+                    name: user.Name,
+                    branch: "Central Hub : Kandy"
+                });
+            } else {
+                const rows = pool.query(`select City from store where StoreID = ?`, [user.StoreID]);
+                return res.status(200).json({
+                    type: user.Type,
+                    name: user.Name,
+                    branch: `Terminal : ${rows[0].City}`
+                });
+            }
         });
     })(req, res, next);
 });

@@ -7,10 +7,6 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-app.use(cors({
-    origin: 'http://localhost:3000',  // Adjust based on where your frontend is running
-    credentials: true,  // Allow credentials (cookies) to be included
-}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
