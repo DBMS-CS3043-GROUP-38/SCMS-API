@@ -1,41 +1,28 @@
+import { Strategy , ExtractJwt } from 'passport-jwt';
 import passport from "passport";
-import { Strategy } from 'passport-local';
-import pool from "../../utilities/database/db.mjs";
-import bcrypt from 'bcrypt';
+import pool from '../../utilities/database/db.mjs';
 
+// Set up JWT options
+const opts = {
+    jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(), // Extract token from Authorization header
+    secretOrKey: process.env.JWT_SECRET, // Your JWT secret
+};
 
-// Local Strategy
-passport.use(new Strategy(async (username, password, done) => {
+// Define the JWT strategy
+passport.use(new Strategy(opts, async (jwt_payload, done) => {
     try {
-        console.log('Authenticating user');
-        const [rows] = await pool.query('SELECT * FROM employee WHERE Username = ?', [username]);
+        // Find the user based on the JWT payload
+        console.log(jwt_payload);
+        const [rows] = await pool.query('SELECT * FROM employee WHERE EmployeeID = ?', [jwt_payload.id]);
         const user = rows[0];
-        if (!user) return done(null, false);
-
-        // Check if the password is valid
-        const isValidPassword = await bcrypt.compare(password, user.PasswordHash);
-        if (!isValidPassword) return done(null, false);
-
-        return done(null, user);  // Authenticated user
+        if (user) {
+            return done(null, user);  // User found, proceed
+        } else {
+            return done(null, false);  // User not found
+        }
     } catch (error) {
-        return done(error);
+        return done(error, false);
     }
 }));
-
-// Serialize user (store user ID in the session)
-passport.serializeUser((user, done) => {
-    done(null, { id: user.EmployeeID, type: user.Type, storeId: user.StoreID });
-});
-
-// Deserialize user (retrieve user details from the session using the ID)
-passport.deserializeUser(async (user, done) => {
-    try {
-        const [rows] = await pool.query('SELECT * FROM employee WHERE EmployeeID = ?', [user.id]);
-        const userData = rows[0];
-        done(null, userData);
-    } catch (error) {
-        done(error, null);
-    }
-});
 
 export default passport;
