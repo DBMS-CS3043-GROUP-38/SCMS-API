@@ -12,7 +12,6 @@ const opts = {
 passport.use(new Strategy(opts, async (jwt_payload, done) => {
     try {
         // Find the user based on the JWT payload
-        console.log(jwt_payload);
         const [rows] = await pool.query('SELECT * FROM employee WHERE EmployeeID = ?', [jwt_payload.id]);
         const user = rows[0];
         if (user) {

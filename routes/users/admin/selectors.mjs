@@ -17,7 +17,7 @@ router.get('/today-trains', async (req, res) => {
                 StoreCity as Destination
             from 
                 train_schedule_with_destinations 
-            where DATE(ScheduleDateTime) = CURDATE() and Status = 'Not Completed' order by ScheduleDateTime;
+            where DATE(ScheduleDateTime) <= CURDATE() and Status = 'Not Completed' order by ScheduleDateTime;
         `;
 
         const [rows] = await pool.query(query);
