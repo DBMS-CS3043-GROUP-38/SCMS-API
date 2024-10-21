@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import passport from '../dashboard/Stratergy.mjs';
 import pool from '../../utilities/database/db.mjs';
 import adminRoutes from '../users/admin/admin.mjs';
+import managerRoute from '../users/manager/manager.mjs'
 import cors from "cors";
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
@@ -41,7 +42,20 @@ const checkAdmin = (req, res, next) => {
     return res.status(401).json({ message: 'You need to log in.' });  // Not authenticated
 };
 
+const checkManager = (req, res, next) => {
+    // Ensure that the user is authenticated and present
+    if (req.user) {
+        // Check if the user type is 'Manager'
+        if (req.user.Type === 'StoreManager') {
+            return next();  // User is manager, proceed to the next middleware or route
+        }
+        return res.status(403).json({ message: 'Access denied. Managers only.' });  // Not authorized
+    }
+    return res.status(401).json({ message: 'You need to log in.' });  // Not authenticated
+}
+
 router.use('/admin', checkAuth, checkAdmin, adminRoutes);
+router.use('/manager', checkAuth, checkManager, managerRoute);
 
 
 router.post('/login', async (req, res) => {
