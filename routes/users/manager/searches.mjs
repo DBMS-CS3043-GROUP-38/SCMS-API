@@ -10,6 +10,7 @@ router.get('/test', (req, res) => {
 
 router.get('/order/:id', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const id = req.params.id;
         if (!id) {
             res.status(400).json({error: 'Order ID not provided'});
@@ -41,10 +42,10 @@ router.get('/order/:id', async (req, res) => {
             from order_details_with_latest_status
                      left outer join trainschedule
                           on order_details_with_latest_status.TrainScheduleID = trainschedule.TrainScheduleID
-            where OrderID = ?;
+            where OrderID = ? and StoreID = ?;
         `;
 
-        const [rows] = await pool.query(query, [id]);
+        const [rows] = await pool.query(query, [id, StoreID]);
         if (rows.length === 0) {
             res.status(404).json({error: 'Order not found'});
         }

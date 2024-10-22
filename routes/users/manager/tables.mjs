@@ -155,6 +155,7 @@ router.get('/orders-by-train/:trainSchID', async (req, res) => {
 
 router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const {year, quarter} = req.params;
         const query = `
             select ProductID    as ProductID,
@@ -177,6 +178,7 @@ router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
 
 router.get('/top-customers-quarter/:year/:quarter', async (req, res) => {
     try {
+        const storeID = req.user.StoreID;
         const {year, quarter} = req.params;
         const query = `
             select c.CustomerID as CustomerID,
@@ -185,7 +187,8 @@ router.get('/top-customers-quarter/:year/:quarter', async (req, res) => {
                    SUM(o.Value) as Revenue
             from (select *
                   from order_details_with_latest_status
-                  where YEAR(OrderDate) = ${year}
+                  where StoreID = ${storeID}
+                  and YEAR(OrderDate) = ${year}
                     and QUARTER(OrderDate) = ${quarter}
                     and LatestStatus not in ('Cancelled', 'Attention')) o
                      join customer c on o.CustomerID = c.CustomerID
@@ -266,13 +269,14 @@ router.get('/train-assigned-orders', async (req, res) => {
 
 router.get('/orders-in-train', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `select tc.OrderID                                      as OrderID,
                               ts.TrainScheduleID                              as TrainScheduleID,
                               ts.StoreCity                                    as Destination,
                               DATE_FORMAT(ts.ScheduleDateTime, '%e-%b-%y %T') as TrainTime
                        from (select *
                              from order_details_with_latest_status
-                             where LatestStatus = 'InTrain') as trainAssigned
+                             where LatestStatus = 'InTrain' and StoreID = ${StoreID}) as trainAssigned
                                 join train_contains tc on trainAssigned.OrderID = tc.OrderID
                                 join train_schedule_with_destinations ts on tc.TrainScheduleID = ts.TrainScheduleID;
         `;
@@ -288,10 +292,12 @@ router.get('/orders-in-train', async (req, res) => {
 
 router.get('/orders-in-store', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select OrderID, StoreID, StoreCity, RouteID
             from order_details_with_latest_status
-            where LatestStatus = 'InStore';
+            where StoreID = ${StoreID}
+                and LatestStatus = 'InStore';
         `
 
         const [rows] = await pool.query(query);
@@ -305,10 +311,12 @@ router.get('/orders-in-store', async (req, res) => {
 
 router.get('/orders-in-shipment', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select OrderID, StoreID, ShipmentID, ShipmentStatus
             from order_details_with_latest_status
-            where LatestStatus = 'InShipment';
+            where StoreID = ${StoreID}
+               and LatestStatus = 'InShipment';
         `
 
 
@@ -323,10 +331,12 @@ router.get('/orders-in-shipment', async (req, res) => {
 
 router.get('/orders-in-truck', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select OrderID, StoreID, TruckID, AssistantID, DriverID
             from order_details_with_latest_status
-            where LatestStatus = 'InTruck';
+            where StoreID = ${StoreID}
+              and LatestStatus = 'InTruck';
         `
 
 
@@ -388,14 +398,12 @@ router.get('/store-data', async (req, res) => {
     }
 });
 
-router.get('/manager-data', async (req, res) => {
+router.get('/admin-data', async (req, res) => {
     try {
-
         const query = `
-            select e.StoreID, s.City, EmployeeID, Name, Contact, Address
-            from employee e
-                     join store s on e.StoreID = s.StoreID
-            where Type = 'StoreManager';
+            select EmployeeID, Name, Contact, Address
+            from employee 
+            where Type = 'Admin';
         `
         const [rows] = await pool.query(query);
         res.json(rows);
@@ -419,6 +427,27 @@ router.get('/top-customers', async (req, res) => {
     } catch (e) {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch top customers'});
+    }
+});
+
+router.get('/drivers', async (req , res) => {
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select DriverID       AS 'Driver ID',
+                   Name           AS 'Driver Name',
+                   Contact        AS 'Phone',
+                   Status         AS 'Availability',
+                   CompletedHours AS 'CompletedHours',
+                   WorkingHours   AS 'WorkHours'
+            from driver_details_with_employee where StoreID = ${StoreID};
+        `;
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch drivers'});
     }
 });
 

@@ -9,11 +9,12 @@ router.get('/test', (req, res) => {
 
 router.get('/quarterly-sales', async (req, res) => {
     try {
+        const storeID = req.user.StoreID;
         const query = `
             select YEAR(OrderDate) as Year, QUARTER(OrderDate) as Quarter, SUM(Value) as TotalRevenue
             from order_details_with_latest_status
-            where LatestStatus != 'Cancelled'
-               or LatestStatus != 'Attention'
+            where (LatestStatus != 'Cancelled'
+               or LatestStatus != 'Attention') and StoreID = ${storeID}
             group by YEAR(OrderDate), QUARTER(OrderDate)
             order by Year desc, Quarter desc
             limit 2;
@@ -123,10 +124,12 @@ router.get('/train-statuses', async (req, res) => {
 });
 
 router.get('/quarterly-orders', async (req, res) => {
+    const storeID = req.user.StoreID;
     try {
         const query = `
             select YEAR(OrderDate) as Year, QUARTER(OrderDate) as Quarter, COUNT(OrderID) as TotalOrders
             from order_details_with_latest_status
+            where StoreID = ${storeID}
             group by YEAR(OrderDate), QUARTER(OrderDate)
             order by Year desc, Quarter desc
             limit 2;

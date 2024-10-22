@@ -143,28 +143,16 @@ router.patch('/report-order/:orderID', async (req, res) => {
              from shipment_contains
              where OrderID = ${orderID};`
         ;
-        const updateSpaceTrain =
-            `update trainschedule
-             set FilledCapacity = FilledCapacity - ?
-             where TrainScheduleID = ?;`;
-
-        const updateSpaceShipment =
-            `update shipment
-             set FilledCapacity = FilledCapacity - ?
-             where ShipmentID = ?;`;
-
 
         const [rows] = await pool.query(orderInfo);
         if (rows.length === 0) {
             return res.json({message: 'Order not found'});
         }
         if (rows[0].TrainScheduleID !== null) {
-            await pool.query(updateSpaceTrain, [rows[0].TotalVolume, rows[0].TrainScheduleID]);
             await pool.query(removeTrain);
             message = message + 'Order removed from train \n';
         }
         if (rows[0].ShipmentID !== null) {
-            await pool.query(updateSpaceShipment, [rows[0].TotalVolume, rows[0].ShipmentID]);
             await pool.query(removeShipment);
             message = message + 'Order removed from shipment \n';
         }

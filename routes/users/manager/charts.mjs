@@ -10,10 +10,11 @@ router.get('/test', (req, res) => {
 
 router.get('/revenue-past-year', async (req, res) => {
     try {
+        const storeID = req.user.StoreID;
         const query = `
             select YEAR(OrderDate) as Year, MONTH(OrderDate) as Month, SUM(Value) as TotalRevenue
             from order_details_with_latest_status
-            where LatestStatus NOT LIKE 'Cancelled'
+            where LatestStatus NOT LIKE 'Cancelled' and StoreID = ${storeID}
             group by YEAR(OrderDate), MONTH(OrderDate)
             order by Year desc, Month desc
             limit 12 offset 1;

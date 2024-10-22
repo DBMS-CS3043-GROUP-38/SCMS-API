@@ -21,12 +21,54 @@ router.post('/schedule-trains', async (req, res) => {
 })
 
 router.post('/bundle-orders', async (req, res) => {
-    let ScheduledOrders = 0;
+    let AddedOrders = 0;
     let message = '';
     const StoreID = req.user.StoreID;
     try {
         // Implement the bundle orders into shipments functionality here
-        res.json({message, ScheduledOrders});
+        const loadOrders = `
+            select * from order_details_with_latest_status where LatestStatus = 'InStore' and StoreID = ${StoreID};
+        `;
+        const getShipment = `
+            select * from shipment where RouteID = ? and Status = 'NotReady';
+         `;
+        const createShipment = `
+            insert into shipment (CreatedDate, Capacity, RouteID, FilledCapacity, Status) VALUE (now(), 250, ?, 0, 'NotReady');
+        `;
+        const addOrderToShipment = `
+            insert into shipment_contains (ShipmentID, OrderID) VALUE (?, ?);
+        `
+        const createRecord = `
+        insert into order_tracking (OrderID, TimeStamp, Status) VALUE (?, now(), 'InShipment');
+        `
+        const [orders] = await pool.query(loadOrders);
+        console.log(orders);
+        if (orders.length === 0) {
+            return res.json({message: 'No orders to bundle', AddedOrders: 0});
+        }
+        for (let i = 0; i < orders.length; i++) {
+            const [shipments] = await pool.query(getShipment, orders[i].RouteID);
+            let orderAdded = false;
+            for (let j = 0; j < shipments.length; j++) {
+                if (shipments[j].FilledCapacity + orders[i].TotalVolume <= shipments[j].Capacity) {
+                    await pool.query(addOrderToShipment, [shipments[j].ShipmentID, orders[i].OrderID]);
+                    await pool.query(createRecord, [orders[i].OrderID]);
+                    orderAdded = true;
+                    message = message + `Order ${orders[i].OrderID} added to existing shipment ${shipments[j].ShipmentID} \n`;
+                    AddedOrders++;
+                    break;
+                }
+            }
+            if (!orderAdded) {
+                const [shipment] = await pool.query(createShipment, orders[i].RouteID);
+                await pool.query(addOrderToShipment, [shipment.insertId, orders[i].OrderID]);
+                await pool.query(createRecord, [orders[i].OrderID]);
+                message = message + `Order ${orders[i].OrderID} added to new shipment ${shipment.insertId} \n`;
+                AddedOrders++;
+            }
+        }
+
+        res.json({message, AddedOrders});
     } catch (e) {
         console.error(e);
         res.status(500).json({error: 'Failed to schedule orders'});
@@ -96,28 +138,16 @@ router.patch('/report-order/:orderID', async (req, res) => {
              from shipment_contains
              where OrderID = ${orderID};`
         ;
-        const updateSpaceTrain =
-            `update trainschedule
-             set FilledCapacity = FilledCapacity - ?
-             where TrainScheduleID = ?;`;
-
-        const updateSpaceShipment =
-            `update shipment
-             set FilledCapacity = FilledCapacity - ?
-             where ShipmentID = ?;`;
-
 
         const [rows] = await pool.query(orderInfo);
         if (rows.length === 0) {
             return res.json({message: 'Order not found'});
         }
         if (rows[0].TrainScheduleID !== null) {
-            await pool.query(updateSpaceTrain, [rows[0].TotalVolume, rows[0].TrainScheduleID]);
             await pool.query(removeTrain);
             message = message + 'Order removed from train \n';
         }
         if (rows[0].ShipmentID !== null) {
-            await pool.query(updateSpaceShipment, [rows[0].TotalVolume, rows[0].ShipmentID]);
             await pool.query(removeShipment);
             message = message + 'Order removed from shipment \n';
         }
