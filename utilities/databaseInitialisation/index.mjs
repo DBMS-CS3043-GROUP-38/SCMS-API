@@ -11,7 +11,7 @@ import truckSchedule from "./truckSchedule.mjs";
 import pool from '../database/db.mjs';
 
 
-const storeCities = ['Kurunegala', 'Colombo', 'Galle', 'Jaffna', 'Anuradhapura', 'Badulla', 'Batticaloa'];
+const storeCities = ['Kurunegala', 'Colombo', 'Galle', 'Jaffna', 'Batticaloa'];
 const productCategories = ['Clothes', 'Groceries', 'Electronics', 'Cosmetics', 'KitchenItems', 'Others'];
 const orderStatuses = ['Pending', 'PendingDispatch', 'TrainAssigned', 'InTrain', 'InStore', 'InShipment', 'InTruck', 'Attention', 'Delivered', 'Cancelled'];
 
