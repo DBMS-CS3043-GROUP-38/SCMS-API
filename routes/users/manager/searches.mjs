@@ -24,6 +24,8 @@ router.get('/order/:id', async (req, res) => {
                    StoreID                                        'Store ID',
                    StoreCity                                      'Store City',
                    RouteID                                        'Route ID',
+                   trainschedule.TrainScheduleID                  'TrainScheduleID',
+                   TrainID                                        'Train ID',
                    ShipmentID                                     'Shipment ID',
                    Value                                          'Value',
                    TotalVolume                                    'Total Volume',
@@ -37,6 +39,8 @@ router.get('/order/:id', async (req, res) => {
                    TruckID                                        'Truck ID',
                    LicencePlate                                   'Truck Licence Plate'
             from order_details_with_latest_status
+                     left outer join trainschedule
+                          on order_details_with_latest_status.TrainScheduleID = trainschedule.TrainScheduleID
             where OrderID = ?;
         `;
 
