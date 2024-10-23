@@ -75,5 +75,19 @@ router.get('/get-stores', async (req, res) => {
     }
 });
 
+router.get('/product-categories', async (req, res) => {
+    try {
+        const query = `
+            select distinct Type as category
+            from product;
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({error: 'Failed to fetch product categories'});
+    }
+});
+
 
 export default router;
