@@ -36,3 +36,25 @@ call LoadInStoreOrders(${StoreID});
 
 CALL CreateShipment(1, @newShipmentID);
 SELECT @newShipmentID;
+
+
+select
+    YEAR(OrderDate) as year,
+    QUARTER(OrderDate) as quarter,
+      RouteID
+     , SUM(Value)                                        as revenue
+from order_details_with_latest_status
+where LatestStatus NOT LIKE 'Cancelled'
+group by YEAR(OrderDate), QUARTER(OrderDate), RouteID
+order by revenue desc;
+
+
+SELECT
+    CONCAT(YEAR(OrderDate), 'Q', QUARTER(OrderDate)) as quarter,
+    RouteID,
+    SUM(Value) as revenue
+FROM order_details_with_latest_status
+WHERE LatestStatus NOT LIKE 'Cancelled'
+  AND StoreID = ?
+GROUP BY quarter, RouteID
+ORDER BY revenue DESC;

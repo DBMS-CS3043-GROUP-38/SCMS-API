@@ -8,21 +8,20 @@ router.get('/test', (req, res) => {
     res.send('Admin dashboard route working');
 });
 
-router.get('/revenue-past-year', async (req, res) => {
+router.get('/revenue-past', async (req, res) => {
     try {
         const query = `
-            select YEAR(OrderDate) as Year, MONTH(OrderDate) as Month, SUM(Value) as TotalRevenue
-            from order_details_with_latest_status
-            where LatestStatus NOT LIKE 'Cancelled'
-            group by YEAR(OrderDate), MONTH(OrderDate)
-            order by Year desc, Month desc
-            limit 12 offset 1;
+            SELECT
+                CONCAT(YEAR(OrderDate), '-Q', QUARTER(OrderDate)) as quarter,
+                SUM(Value) as TotalRevenue
+            FROM order_details_with_latest_status
+            WHERE LatestStatus NOT LIKE 'Cancelled'
+            GROUP BY quarter
+            ORDER BY quarter DESC;
         `;
 
         const [rows] = await pool.query(query);
-        const revenueData = formatRevenueData(rows);
-        console.log(`Fetched revenue data: ${revenueData.length} rows`);
-        res.json(revenueData);
+        res.json(rows);
     } catch (e) {
         console.error(e);
         res.status(500).json({error: 'Failed to fetch revenue data'});
@@ -103,6 +102,30 @@ router.get('/customer-distribution', async (req, res) => {
     } catch (e) {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch customer distribution'});
+    }
+});
+
+router.get('/route-sales/:storeID', async (req, res) => {
+    try {
+        const {storeID} = req.params;
+        const query = `
+            SELECT
+                CONCAT(YEAR(OrderDate), '-Q', QUARTER(OrderDate)) as quarter,
+                RouteID,
+                SUM(Value) as revenue
+            FROM order_details_with_latest_status
+            WHERE LatestStatus NOT LIKE 'Cancelled'
+              AND StoreID = ${storeID}
+            GROUP BY quarter, RouteID
+            ORDER BY quarter;
+        `;
+
+        const [rows] = await pool.query(query);
+        console.log(`Fetched route sales: ${rows.length} rows`);
+        res.json(rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: 'Failed to fetch route sales'});
     }
 });
 

@@ -8,22 +8,20 @@ router.get('/test', (req, res) => {
     res.send('Admin dashboard route working');
 });
 
-router.get('/revenue-past-year', async (req, res) => {
+router.get('/revenue-past', async (req, res) => {
     try {
-        const storeID = req.user.StoreID;
         const query = `
-            select YEAR(OrderDate) as Year, MONTH(OrderDate) as Month, SUM(Value) as TotalRevenue
-            from order_details_with_latest_status
-            where LatestStatus NOT LIKE 'Cancelled' and StoreID = ${storeID}
-            group by YEAR(OrderDate), MONTH(OrderDate)
-            order by Year desc, Month desc
-            limit 12 offset 1;
+            SELECT
+                CONCAT(YEAR(OrderDate), '-Q', QUARTER(OrderDate)) as quarter,
+                SUM(Value) as TotalRevenue
+            FROM order_details_with_latest_status
+            WHERE LatestStatus NOT LIKE 'Cancelled'
+            GROUP BY quarter
+            ORDER BY quarter DESC;
         `;
 
         const [rows] = await pool.query(query);
-        const revenueData = formatRevenueData(rows);
-        console.log(`Fetched revenue data: ${revenueData.length} rows`);
-        res.json(revenueData);
+        res.json(rows);
     } catch (e) {
         console.error(e);
         res.status(500).json({error: 'Failed to fetch revenue data'});
