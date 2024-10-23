@@ -291,6 +291,101 @@ BEGIN
 END;
 //
 
+CREATE TRIGGER before_train_contains_delete
+    BEFORE DELETE
+    ON Train_Contains
+    FOR EACH ROW
+BEGIN
+    DECLARE total_volume DECIMAL(10, 2);
+    DECLARE new_filled_capacity DECIMAL(10, 2);
+
+    -- Get the TotalVolume of the Order being removed
+    SELECT TotalVolume
+    INTO total_volume
+    FROM `Order`
+    WHERE OrderID = OLD.OrderID;
+
+    -- Calculate the new filled capacity by subtracting the total volume
+    SELECT FilledCapacity - total_volume
+    INTO new_filled_capacity
+    FROM TrainSchedule
+    WHERE TrainScheduleID = OLD.TrainScheduleID;
+
+    -- Update the FilledCapacity in the TrainSchedule table
+    UPDATE TrainSchedule
+    SET FilledCapacity = new_filled_capacity
+    WHERE TrainScheduleID = OLD.TrainScheduleID;
+END;
+//
+
+
+create trigger before_shipment_contains_insert
+    before insert
+    on Shipment_contains
+    for each row
+begin
+    declare total_volume decimal(10, 2);
+    declare capacity decimal(10, 2);
+    declare new_filled_capacity decimal(10, 2);
+
+    -- Get the TotalVolume of the Order being added
+    select TotalVolume
+    into total_volume
+    from `Order`
+    where OrderID = NEW.OrderID;
+
+    -- Get the Capacity of the Shipment
+    select Capacity
+    into capacity
+    from Shipment
+    where ShipmentID = NEW.ShipmentID;
+
+    -- Calculate the new filled capacity
+    select FilledCapacity + total_volume
+    into new_filled_capacity
+    from Shipment
+    where ShipmentID = NEW.ShipmentID;
+
+    -- Check if the new filled capacity exceeds the capacity
+    if new_filled_capacity > capacity then
+        signal sqlstate '45000'
+            set message_text = 'Error: Adding this order would exceed the shipment\'s capacity.';
+    else
+        -- Update the FilledCapacity in the Shipment table
+        update Shipment
+        set FilledCapacity = new_filled_capacity
+        where ShipmentID = NEW.ShipmentID;
+    end if;
+end;
+//
+
+create trigger before_shipment_contains_delete
+    before delete
+    on Shipment_contains
+    for each row
+begin
+    declare total_volume decimal(10, 2);
+    declare new_filled_capacity decimal(10, 2);
+
+    -- Get the TotalVolume of the Order being removed
+    select TotalVolume
+    into total_volume
+    from `Order`
+    where OrderID = OLD.OrderID;
+
+    -- Calculate the new filled capacity by subtracting the total volume
+    select FilledCapacity - total_volume
+    into new_filled_capacity
+    from Shipment
+    where ShipmentID = OLD.ShipmentID;
+
+    -- Update the FilledCapacity in the Shipment table
+    update Shipment
+    set FilledCapacity = new_filled_capacity
+    where ShipmentID = OLD.ShipmentID;
+end;
+//
+
 
 # Views
 
@@ -502,6 +597,16 @@ ORDER BY SaleDate DESC, TotalRevenue DESC
 ;
 //
 
+
+CREATE VIEW Truck_Distances AS
+SELECT ts.TruckID,
+       SUM(r.Distance) AS TotalDistance
+FROM TruckSchedule ts
+         JOIN Route r ON ts.RouteID = r.RouteID
+WHERE ts.Status = 'Completed'
+GROUP BY ts.TruckID;
+//
+
 # Functions
 
 -- This function adds future train schedules for the next 7 days
@@ -570,21 +675,43 @@ BEGIN
 END;
 //
 
-# View for truck distances
+# Procedures
 
-CREATE VIEW Truck_Distances AS
-SELECT
-    ts.TruckID,
-    SUM(r.Distance) AS TotalDistance
-FROM
-    TruckSchedule ts
-        JOIN Route r ON ts.RouteID = r.RouteID
-WHERE
-    ts.Status = 'Completed'
-GROUP BY
-    ts.TruckID;
+
+CREATE PROCEDURE LoadInStoreOrders(IN i_StoreID INT)
+BEGIN
+    SELECT *
+    FROM order_details_with_latest_status
+    WHERE StoreID = i_StoreID AND LatestStatus = 'InStore';
+END;
 //
 
+CREATE PROCEDURE GetShipmentForRoute(IN i_StoreID INT, IN i_RouteID INT)
+BEGIN
+    SELECT *
+    FROM shipment
+             JOIN route ON shipment.RouteID = route.RouteID
+    WHERE route.StoreID = i_StoreID AND route.RouteID = i_RouteID and StoreID and Status = 'NotReady';
+END;
+//
+
+CREATE PROCEDURE CreateShipment(IN RouteID INT, OUT ShipmentID INT)
+BEGIN
+    -- Insert new shipment
+    INSERT INTO shipment (CreatedDate, Capacity, FilledCapacity, Status, RouteID)
+    VALUES (NOW(), 250, 0, 'NotReady', RouteID);
+
+    -- Get the ID of the newly inserted shipment
+    SET ShipmentID = LAST_INSERT_ID();
+END;
+//
+
+CREATE PROCEDURE AddOrderToShipment(IN ShipmentID INT, IN OrderID INT)
+BEGIN
+    INSERT INTO shipment_contains (ShipmentID, OrderID)
+    VALUES (ShipmentID, OrderID);
+END;
+//
 
 
 DELIMITER ;

@@ -20,71 +20,66 @@ router.post('/schedule-trains', async (req, res) => {
     }
 })
 
-router.post('/schedule-orders', async (req, res) => {
-    let ScheduledOrders = 0;
+router.post('/bundle-orders', async (req, res) => {
+    let AddedOrders = 0;
     let message = '';
+    const StoreID = req.user.StoreID;
     try {
-
-        const [orders] = await pool.query(`select *
-                                           from order_details_with_latest_status
-                                           where LatestStatus = 'Pending'`);
-        const [trains] = await pool.query(`select *
-                                           from train_schedule_with_destinations
-                                           where Status = 'Not Completed'
-                                           order by ScheduleDateTime`);
-        const TotalOrders = orders.length;
-        const TotalTrains = trains.length;
-
-        if (orders.length === 0 || trains.length === 0) {
-            return res.json({message: 'No orders or trains to schedule', ScheduledOrders: 0});
+        // Implement the bundle orders into shipments functionality here
+        const loadOrders = `
+            select * from order_details_with_latest_status where LatestStatus = 'InStore' and StoreID = ${StoreID};
+        `;
+        const getShipment = `
+            select * from shipment where RouteID = ? and Status = 'NotReady';
+         `;
+        const createShipment = `
+            insert into shipment (CreatedDate, Capacity, RouteID, FilledCapacity, Status) VALUE (now(), 250, ?, 0, 'NotReady');
+        `;
+        const addOrderToShipment = `
+            insert into shipment_contains (ShipmentID, OrderID) VALUE (?, ?);
+        `
+        const createRecord = `
+        insert into order_tracking (OrderID, TimeStamp, Status) VALUE (?, now(), 'InShipment');
+        `
+        const [orders] = await pool.query(loadOrders);
+        console.log(orders);
+        if (orders.length === 0) {
+            return res.json({message: 'No orders to bundle', AddedOrders: 0});
         }
-
-        //Looping through each order and assigning it to a train
-        for (let i = 0; i < TotalOrders; i++) {
-            console.log(`Processing order ${orders[i].OrderID} with volume ${orders[i].TotalVolume}`);
-            for (let j = 0; j < TotalTrains; j++) {
-                //Break if train is not to destination
-                if (orders[i].StoreCity !== trains[j].StoreCity) {
-                    console.log(`Order ${orders[i].OrderID} is not for train ${trains[j].TrainScheduleID}`);
-                    continue;
-                }
-                console.log(`Checking train ${trains[j].TrainScheduleID} with remaining capacity ${trains[j].RemainingCapacity}`);
-                if (parseFloat(orders[i].TotalVolume) <= parseFloat(trains[j].RemainingCapacity)) {
-                    console.log(`Order ${orders[i].OrderID} can be scheduled to train ${trains[j].TrainScheduleID}`);
-                    const changeStatus = `
-                        insert into order_tracking (OrderID, TimeStamp, Status) value (${orders[i].OrderID}, now(), 'PendingDispatch');
-                    `;
-                    await pool.query(changeStatus);
-                    const assignATrain = `
-                        insert into train_contains (TrainScheduleID, OrderID) VALUE (${trains[j].TrainScheduleID}, ${orders[i].OrderID});
-                    `;
-                    await pool.query(assignATrain);
-                    ScheduledOrders++;
-                    console.log(`Order ${orders[i].OrderID} scheduled to train ${trains[j].TrainScheduleID}`);
-                    //Update the remaining capacity of the train in local variable
-                    trains[j].RemainingCapacity = (parseFloat(trains[j].RemainingCapacity) - parseFloat(orders[i].TotalVolume)).toFixed(2);
-
+        for (let i = 0; i < orders.length; i++) {
+            const [shipments] = await pool.query(getShipment, orders[i].RouteID);
+            let orderAdded = false;
+            for (let j = 0; j < shipments.length; j++) {
+                if (shipments[j].FilledCapacity + orders[i].TotalVolume <= shipments[j].Capacity) {
+                    await pool.query(addOrderToShipment, [shipments[j].ShipmentID, orders[i].OrderID]);
+                    await pool.query(createRecord, [orders[i].OrderID]);
+                    orderAdded = true;
+                    message = message + `Order ${orders[i].OrderID} added to existing shipment ${shipments[j].ShipmentID} \n`;
+                    AddedOrders++;
                     break;
                 }
-                console.log(`Order ${orders[i].OrderID} cannot be scheduled to train ${trains[j].TrainScheduleID}`);
+            }
+            if (!orderAdded) {
+                const [shipment] = await pool.query(createShipment, orders[i].RouteID);
+                await pool.query(addOrderToShipment, [shipment.insertId, orders[i].OrderID]);
+                await pool.query(createRecord, [orders[i].OrderID]);
+                message = message + `Order ${orders[i].OrderID} added to new shipment ${shipment.insertId} \n`;
+                AddedOrders++;
             }
         }
-        message = 'No orders could be scheduled might be due to insufficient capacity';
-        if (ScheduledOrders > 0) {
-            message = `${ScheduledOrders} out of ${TotalOrders} orders scheduled successfully`
-        }
-        res.json({message, ScheduledOrders});
+
+        res.json({message, AddedOrders});
     } catch (e) {
         console.error(e);
         res.status(500).json({error: 'Failed to schedule orders'});
     }
 });
 
-router.post('/dispatch-train/:trainID', async (req, res) => {
+router.post('/receive-train/:trainID', async (req, res) => {
     const {trainID} = req.params;
     let dispatchedOrders = 0;
     let message = '';
-    console.log(`Dispatching train ${trainID}`);
+    console.log(`Receiving train ${trainID}`);
     try {
         const getOrders = `
             select OrderID
@@ -92,11 +87,11 @@ router.post('/dispatch-train/:trainID', async (req, res) => {
             where TrainScheduleID = ${trainID};
         `;
         const setOrderStatus = `
-            insert into order_tracking(OrderID, TimeStamp, Status) VALUE (?, now(), 'InTrain');
+            insert into order_tracking(OrderID, TimeStamp, Status) VALUE (?, now(), 'InStore');
         `;
         const setTrainStatus = `
             update trainschedule
-            set Status = 'In Progress'
+            set Status = 'Completed'
             where TrainScheduleID = ${trainID};
         `;
 
@@ -108,14 +103,14 @@ router.post('/dispatch-train/:trainID', async (req, res) => {
         }
         await pool.query(setTrainStatus);
 
-        message = `Train ${trainID} dispatched with No orders`;
+        message = `Train ${trainID} received with No orders`;
         if (dispatchedOrders > 0) {
-            message = `${dispatchedOrders} out of ${TotalOrders} orders dispatched with trainSchedule ${trainID}`;
+            message = `${dispatchedOrders} out of ${TotalOrders} orders received with trainSchedule ${trainID}`;
         }
         res.json({message, dispatchedOrders});
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to dispatch train'});
+        res.status(500).json({error: 'Failed to receive train'});
     }
 });
 
