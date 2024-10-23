@@ -336,5 +336,38 @@ router.get('/truck', async (req, res) => {
     }
 })
 
+router.get('/product/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const query = `
+            select ProductID as id, Name as name, Type as category, Price as price
+            from product
+            where ProductID = ${id};
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({error: 'Failed to fetch products'});
+    }
+})
+
+router.get('/product-sales/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const query = `
+            SELECT CONCAT(Year, ' - ', Quarter) AS Quarter, TotalRevenue
+            FROM quarterly_product_report
+            WHERE ProductID = ${id}
+            ORDER BY Year, Quarter;
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch product sales'});
+    }
+})
+
 
 export default router;

@@ -47,6 +47,44 @@ router.get('/best-products-quarter', async (req, res) => {
     }
 });
 
+router.get('/products/:type', async (req, res) => {
+    try {
+        const type = req.params.type;
+        var query;
+        if (type === 'All') {
+            query = `
+                select product.ProductID                    as 'id',
+
+                       product.Name                         as 'Product Name',
+                       product.Price                        as 'Price',
+                       COUNT(contains.OrderID)              as 'Total Orders',
+                       SUM(contains.Amount * product.Price) as 'Total Revenue'
+                from product
+                         join contains on product.ProductID = contains.ProductID
+                group by product.ProductID;
+            `;
+        } else {
+            query = `
+                select product.ProductID                    as 'id',
+                       product.Name                         as 'Product Name',
+                       product.Price                        as 'Price',
+                       COUNT(contains.OrderID)              as 'Total Orders',
+                       SUM(contains.Amount * product.Price) as 'Total Revenue'
+                from product
+                         join contains on product.ProductID = contains.ProductID
+                where product.Type = '${type}'
+                group by product.ProductID;
+            `;
+        }
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch products'});
+    }
+})
+
+
 router.get('/weekly-trains', async (req, res) => {
     try {
         const query = `
@@ -162,8 +200,7 @@ router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
             from quarterly_product_report
             where Year = ${year}
               and Quarter = ${quarter}
-            order by revenue desc
-            limit 100;
+            order by revenue desc;
         `;
         const [rows] = await pool.query(query);
         res.json(rows);
