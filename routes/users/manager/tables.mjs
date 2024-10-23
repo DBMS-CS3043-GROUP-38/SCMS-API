@@ -94,6 +94,7 @@ router.get('/scheduled-trains', async (req, res) => {
 
 router.get('/active-trains', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select TrainID          as id,
                    TrainScheduleID  as scheduleID,
@@ -103,7 +104,8 @@ router.get('/active-trains', async (req, res) => {
                    ScheduleDateTime as time,
                    Status           as status
             from train_schedule_with_destinations
-            where Status != 'Completed'
+            where StoreID = ${StoreID}
+              and Status != 'Completed'
             order by ScheduleDateTime;
         `
         const [rows] = await pool.query(query);
@@ -112,6 +114,30 @@ router.get('/active-trains', async (req, res) => {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch active trains'});
     }
+})
+
+router.get('/active-shipments', async (req, res) => {
+  try {
+      const StoreID = req.user.StoreID;
+      const query = `
+          select ShipmentID     as id,
+                 route.RouteID  as routeID,
+                 FilledCapacity as capacityFilled,
+                 Capacity       as fullCapacity,
+                 CreatedDate    as createdData,
+                 Status         as status
+          from shipment
+                   join route on shipment.RouteID = route.RouteID
+          where StoreID = ${StoreID}
+            and Status != 'Completed'
+          order by CreatedDate;
+      `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+  }  catch (e) {
+      console.log(e);
+      res.status(500).json({error: 'Failed to fetch active shipments'});
+  }
 })
 
 router.get('/instore-orders-list', async (req, res) => {
@@ -448,6 +474,71 @@ router.get('/drivers', async (req , res) => {
     } catch (e) {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch drivers'});
+    }
+});
+
+
+router.get('/assistants', async (req , res) => {
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select AssistantID    AS 'Assistant ID',
+                   Name           AS 'Assistant Name',
+                   StoreID        AS 'Store ID',
+                   Contact        AS 'Phone',
+                   Status         AS 'Availability',
+                   CompletedHours AS 'CompletedHours',
+                   WorkingHours   AS 'WorkHours'
+            from assistant_details_with_employee where StoreID = ${StoreID};
+        `;
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch assistant'});
+    }
+});
+
+router.get('/trucks', async (req , res) => {
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select td.TruckID    AS 'Truck ID',
+                   LicencePlate  AS 'Licence Plate',
+                   TotalDistance AS 'Total Distance(KM)',
+                   Status        as 'Availability'
+            from truck
+                     join truck_distances td on truck.TruckID = td.TruckID
+            where StoreID = ${StoreID}
+            order by td.TruckID;
+        `;
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch trucks'});
+    }
+});
+
+router.get('/routes', async (req , res) => {
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select RouteID       AS 'Route ID',
+                   StoreID       AS 'Store ID',
+                   Distance      AS 'Distance(KM)',
+                   Time_duration AS 'Time Duration',
+                   Description   AS 'Description'
+            from route where StoreID = ${StoreID};
+        `;
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch routes'});
     }
 });
 

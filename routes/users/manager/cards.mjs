@@ -111,14 +111,31 @@ router.get('/today-sales', async (req, res) => {
 
 router.get('/train-statuses', async (req, res) => {
     try {
+        const storeID = req.user.StoreID;
         const query = `
-            select Status, count(TrainID) as count
-            from trainschedule
+            select Status, count(train.TrainID) as count
+            from trainschedule join train on trainschedule.TrainID = train.TrainID where StoreID = ${storeID}
             group by Status;
         `;
         const [rows] = await pool.query(query);
         res.json(rows);
     } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch train statuses'});
+    }
+});
+
+
+router.get('/shipment-statuses', async (req, res) => {
+    try {
+        const storeID = req.user.StoreID;
+        const query = `
+            select Status ,count(ShipmentID) as count from shipment join route on shipment.RouteID = route.RouteID where StoreID = ${storeID} group by Status;
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
         res.status(500).json({error: 'Failed to fetch train statuses'});
     }
 });
