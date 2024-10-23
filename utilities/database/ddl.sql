@@ -677,7 +677,6 @@ END;
 
 # Procedures
 
-
 CREATE PROCEDURE LoadInStoreOrders(IN i_StoreID INT)
 BEGIN
     SELECT *
