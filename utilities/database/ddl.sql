@@ -657,7 +657,7 @@ BEGIN
         END IF;
 
         -- Add schedules for this train
-        SET date_ptr = start_date;
+        SET date_ptr = DATE_ADD(start_date, INTERVAL 1 DAY);
         WHILE date_ptr <= end_date
             DO
                 IF DAYNAME(date_ptr) = train_day THEN

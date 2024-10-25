@@ -147,49 +147,58 @@ router.post('/dispatch-train/:trainID', async (req, res) => {
 
 
 router.patch('/report-order/:orderID', async (req, res) => {
+    const connection = await pool.getConnection(); // Get a connection for transaction
     try {
-        let message = '';
-        const {orderID} = req.params;
-        const orderInfo = `
-            select TotalVolume, ShipmentID, TrainScheduleID
-            from order_details_with_latest_status
-            where OrderID = ${orderID}
-              and LatestStatus not in ('Attention', 'Delivered', 'Cancelled');
-        `;
-        const tracking =
-            `            insert into order_tracking (OrderID, TimeStamp, Status) value (${orderID}, now(), 'Attention');
-            `;
-        const removeTrain =
-            `delete
-             from train_contains
-             where OrderID = ${orderID};`
-        ;
-        const removeShipment =
-            `delete
-             from shipment_contains
-             where OrderID = ${orderID};`
-        ;
+        let message = [];
+        const { orderID } = req.params;
 
-        const [rows] = await pool.query(orderInfo);
+        await connection.beginTransaction(); // Start transaction
+
+        const orderInfo = `
+            SELECT TotalVolume, ShipmentID, TrainScheduleID
+            FROM order_details_with_latest_status
+            WHERE OrderID = ?
+              AND LatestStatus NOT IN ('Attention', 'Delivered', 'Cancelled');
+        `;
+        const [rows] = await connection.query(orderInfo, [orderID]);
+
         if (rows.length === 0) {
-            return res.json({message: 'Order not found'});
+            await connection.rollback(); // Rollback if no eligible order is found
+            return res.json({ message: 'Order not found or not eligible' });
         }
+
+        // Delete from train_contains and shipment_contains, triggers handle capacity
         if (rows[0].TrainScheduleID !== null) {
-            await pool.query(removeTrain);
-            message = message + 'Order removed from train \n';
+            const removeTrain = `DELETE FROM train_contains WHERE OrderID = ?;`;
+            await connection.query(removeTrain, [orderID]);
+            message.push('Order removed from train');
         }
+
         if (rows[0].ShipmentID !== null) {
-            await pool.query(removeShipment);
-            message = message + 'Order removed from shipment \n';
+            const removeShipment = `DELETE FROM shipment_contains WHERE OrderID = ?;`;
+            await connection.query(removeShipment, [orderID]);
+            message.push('Order removed from shipment');
         }
-        await pool.query(tracking);
-        message = message + 'Order status changed to Attention';
-        res.json({message});
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({error: 'Failed to update order status'});
+
+        // Update order status in order_tracking table
+        const tracking = `
+            INSERT INTO order_tracking (OrderID, TimeStamp, Status)
+            VALUES (?, NOW(), 'Attention');
+        `;
+        await connection.query(tracking, [orderID]);
+        message.push('Order status changed to Attention');
+
+        await connection.commit(); // Commit transaction
+        res.json({ message: message.join(', ') }); // Send message as comma-separated string
+    } catch (error) {
+        await connection.rollback(); // Rollback transaction on error
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update order status' });
+    } finally {
+        connection.release(); // Release connection back to pool
     }
 });
+
 
 
 router.patch('/cancel-order/:orderID', async (req, res) => {
