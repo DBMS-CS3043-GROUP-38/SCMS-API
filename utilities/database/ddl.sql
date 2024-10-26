@@ -206,6 +206,11 @@ CREATE TABLE `Order_Tracking`
 );
 
 
+-- Indexes
+CREATE INDEX idx_order_id ON `Order` (OrderID);
+create index idx_train_schedule_id on TrainSchedule (TrainScheduleID, Status);
+
+
 DELIMITER //
 # Triggers
 
@@ -607,6 +612,7 @@ WHERE ts.Status = 'Completed'
 GROUP BY ts.TruckID;
 //
 
+
 # Functions
 
 -- This function adds future train schedules for the next 7 days
@@ -676,9 +682,38 @@ END;
 //
 
 
-# Indexes
-CREATE INDEX idx_order_id ON `Order` (OrderID);
-create index idx_train_schedule_id on TrainSchedule (TrainScheduleID, Status);
+-- Trigger to check work hours for driver and assistant when creating a truck schedule
+-- CREATE TRIGGER check_schedule_work_hours BEFORE INSERT ON TruckSchedule
+-- FOR EACH ROW
+-- BEGIN
+--     DECLARE driverWorkingHours INT;
+--     DECLARE driverCompletedHours INT;
+--     DECLARE assistantWorkingHours INT;
+--     DECLARE assistantCompletedHours INT;
+--     DECLARE scheduleHours TIME;
 
+--     -- Get working and completed hours for the driver
+--     SELECT WorkingHours, CompletedHours INTO driverWorkingHours, driverCompletedHours
+--     FROM Driver
+--     WHERE DriverID = NEW.DriverID;
+
+--     -- Get working and completed hours for the assistant
+--     SELECT WorkingHours, CompletedHours INTO assistantWorkingHours, assistantCompletedHours
+--     FROM Assistant
+--     WHERE AssistantID = NEW.AssistantID;
+
+--     -- Get the hours for the schedule
+--     SET scheduleHours = NEW.Hours;
+
+--     -- Check if the driver's hours exceed
+--     IF (driverCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > driverWorkingHours THEN
+--         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds driver\'s available work hours';
+--     END IF;
+
+--     -- Check if the assistant's hours exceed
+--     IF (assistantCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > assistantWorkingHours THEN
+--         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds assistant\'s available work hours';
+--     END IF;
+-- END //
 
 DELIMITER ;

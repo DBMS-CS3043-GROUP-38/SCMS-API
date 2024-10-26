@@ -9,7 +9,7 @@ const hashCountEnv = process.env.HASH_COUNT;
 const hashCount = hashCountEnv ? parseInt(hashCountEnv) : 10;
 
 async function createEmployee(data) {
-    const {name, username, address, password, StoreID, type, contact} = data;
+    const { name, username, address, password, StoreID, type, contact } = data;
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
         const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID, Contact)
@@ -91,7 +91,7 @@ async function userCreation(cities) {
 
     //Generate Drivers and Assistants for each store
     for (let i = 1; i <= cities.length; i++) {
-        const DriverCount = Math.floor(Math.random() * 20) + 1;
+        const DriverCount = Math.floor(Math.random() * 15) + 5;
         for (let j = 0; j < DriverCount; j++) {
             const name = faker.person.fullName();
             const randomNumber = Math.floor(Math.random() * 1000);
@@ -109,7 +109,7 @@ async function userCreation(cities) {
             await createEmployee(data);
         }
 
-        const AssistantCount = Math.floor(Math.random() * 20) + DriverCount;
+        const AssistantCount = Math.floor(Math.random() * 10) + DriverCount;
         for (let j = 0; j < AssistantCount; j++) {
             const name = faker.person.fullName();
             const randomNumber = Math.floor(Math.random() * 1000);
