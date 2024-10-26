@@ -657,7 +657,7 @@ BEGIN
         END IF;
 
         -- Add schedules for this train
-        SET date_ptr = start_date;
+        SET date_ptr = DATE_ADD(start_date, INTERVAL 1 DAY);
         WHILE date_ptr <= end_date
             DO
                 IF DAYNAME(date_ptr) = train_day THEN
@@ -675,42 +675,10 @@ BEGIN
 END;
 //
 
-# Procedures
 
-CREATE PROCEDURE LoadInStoreOrders(IN i_StoreID INT)
-BEGIN
-    SELECT *
-    FROM order_details_with_latest_status
-    WHERE StoreID = i_StoreID AND LatestStatus = 'InStore';
-END;
-//
-
-CREATE PROCEDURE GetShipmentForRoute(IN i_StoreID INT, IN i_RouteID INT)
-BEGIN
-    SELECT *
-    FROM shipment
-             JOIN route ON shipment.RouteID = route.RouteID
-    WHERE route.StoreID = i_StoreID AND route.RouteID = i_RouteID and StoreID and Status = 'NotReady';
-END;
-//
-
-CREATE PROCEDURE CreateShipment(IN RouteID INT, OUT ShipmentID INT)
-BEGIN
-    -- Insert new shipment
-    INSERT INTO shipment (CreatedDate, Capacity, FilledCapacity, Status, RouteID)
-    VALUES (NOW(), 250, 0, 'NotReady', RouteID);
-
-    -- Get the ID of the newly inserted shipment
-    SET ShipmentID = LAST_INSERT_ID();
-END;
-//
-
-CREATE PROCEDURE AddOrderToShipment(IN ShipmentID INT, IN OrderID INT)
-BEGIN
-    INSERT INTO shipment_contains (ShipmentID, OrderID)
-    VALUES (ShipmentID, OrderID);
-END;
-//
+# Indexes
+CREATE INDEX idx_order_id ON `Order` (OrderID);
+create index idx_train_schedule_id on TrainSchedule (TrainScheduleID, Status);
 
 
 DELIMITER ;
