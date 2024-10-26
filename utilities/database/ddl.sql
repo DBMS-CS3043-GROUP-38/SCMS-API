@@ -210,6 +210,9 @@ CREATE TABLE `Order_Tracking`
 CREATE INDEX idx_order_id ON `Order` (OrderID);
 create index idx_train_schedule_id on TrainSchedule (TrainScheduleID, Status);
 
+-- Create index on Username for faster lookup
+CREATE INDEX idx_username ON customer (Username);
+
 
 DELIMITER //
 # Triggers
@@ -716,17 +719,13 @@ END;
 --     END IF;
 -- END //
 
-DELIMITER ;
 
 
 
-
-
-----------------------------------Procedures-------------------------------------
+# ----------------------------------Procedures-------------------------------------
 
 
 -- Stored Procedures new ones here
-DELIMITER $$
 
 CREATE PROCEDURE CreateOrderWithItems (
     IN p_CustomerID INT,
@@ -758,62 +757,33 @@ BEGIN
 
     -- Loop through the products and insert them into the Contains table
     WHILE productIndex < productCount DO
-        -- Extract ProductID and Amount from JSON array
-        SET productID = JSON_UNQUOTE(JSON_EXTRACT(p_Products, CONCAT('$[', productIndex, '].ProductID')));
-        SET amount = JSON_UNQUOTE(JSON_EXTRACT(p_Products, CONCAT('$[', productIndex, '].Amount')));
+            -- Extract ProductID and Amount from JSON array
+            SET productID = JSON_UNQUOTE(JSON_EXTRACT(p_Products, CONCAT('$[', productIndex, '].ProductID')));
+            SET amount = JSON_UNQUOTE(JSON_EXTRACT(p_Products, CONCAT('$[', productIndex, '].Amount')));
 
-        -- Insert into Contains table
-        INSERT INTO `Contains` (`OrderID`, `ProductID`, `Amount`)
-        VALUES (@lastOrderID, productID, amount);
+            -- Insert into Contains table
+            INSERT INTO `Contains` (`OrderID`, `ProductID`, `Amount`)
+            VALUES (@lastOrderID, productID, amount);
 
-        -- Increment index
-        SET productIndex = productIndex + 1;
-    END WHILE;
+            -- Increment index
+            SET productIndex = productIndex + 1;
+        END WHILE;
 
     -- Commit the transaction
     COMMIT;
-END$$
-
-DELIMITER ;
+END//
 
 
 
 -- Stored Procedure to get routes by city
 
-DELIMITER //
 CREATE PROCEDURE GetRoutesByCity(IN cityName VARCHAR(255))
 BEGIN
-    SELECT RouteID, Description 
-    FROM route 
-    LEFT JOIN store USING (StoreID) 
+    SELECT RouteID, Description
+    FROM route
+             LEFT JOIN store USING (StoreID)
     WHERE City = cityName;
 END //
+
+
 DELIMITER ;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#indexes for the tables
--- Create index on Username for faster lookup
-CREATE INDEX idx_username ON customer (Username);
