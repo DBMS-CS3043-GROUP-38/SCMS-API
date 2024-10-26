@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.mjs';
 import orderRoute from './routes/users/customer/order.mjs';
 import citiesRoute from './routes/users/customer/cities.mjs';
 import routeRoute from './routes/users/customer/getroute.mjs';
+import profileRouter from './routes/users/customer/profile.mjs';
+
 dotenv.config();
 
 const app = express();
@@ -23,7 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/order', orderRoute);
 app.use('/api/cities', citiesRoute);
 app.use('/api/getroutes', routeRoute);
-
+app.use('/api/profile', profileRouter);
 
 
 app.get('/test', (req, res) => {
