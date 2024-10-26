@@ -8,6 +8,7 @@ const router = express.Router();
 // GET endpoint to retrieve products by category
 router.get('/products/Type/:type', async (req, res) => {
     const productCategory = req.params.type; // Get the category from the request URL
+    console.log(`Looking for products in category: ${productCategory}`);
 
     try {
         // Query the database for products in the specified category

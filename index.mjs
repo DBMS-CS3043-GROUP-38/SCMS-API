@@ -2,18 +2,25 @@ import express from "express";
 import dotenv from "dotenv";
 import dashboardRoutes from './routes/dashboard/dashboard.mjs';
 import itemsRouter from './routes/users/customer/displayItems.mjs';
-import authRoutes from './routes/auth.mjs';
+import authRoutes from './routes/users/customer/auth.mjs';
 import orderRoute from './routes/users/customer/order.mjs';
 import citiesRoute from './routes/users/customer/cities.mjs';
 import routeRoute from './routes/users/customer/getroute.mjs';
 import profileRouter from './routes/users/customer/profile.mjs';
-
+import cors from 'cors';
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(cors(
+    {
+        origin: ['http://localhost:3001', 'http://localhost:3002'],
+        credentials: true
+    }
+));
 
 // Routes
 app.use('/dashboard', dashboardRoutes);

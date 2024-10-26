@@ -18,7 +18,7 @@ async function productCreation(categories) {
     let createdProducts = 0;
 
     for (const category of categories) {
-        const numberOfProducts = Math.floor(Math.random() * 100) + 1;
+        const numberOfProducts = Math.floor(Math.random() * 25) + 10;
         for (let i = 0; i < numberOfProducts; i++) {
             const name = faker.commerce.productName();
             //

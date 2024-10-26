@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import pool from '../utilities/database/db.mjs'; // Adjust the path to your db.mjs file
+import pool from '../../../utilities/database/db.mjs'; // Adjust the path to your db.mjs file
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -31,10 +31,12 @@ router.post('/login', async (req, res) => {
 
     try {
         const [rows] = await pool.execute('SELECT * FROM customer WHERE Username = ?', [Username]);
+        console.log(rows);
         if (rows.length === 0) return res.status(400).json({ message: 'Invalid credentials' });
 
         const user = rows[0];
         const isPasswordValid = await bcrypt.compare(Password, user.PasswordHash);
+        console.log(isPasswordValid);
         if (!isPasswordValid) return res.status(400).json({ message: 'Invalid credentials' });
 
         // Create JWT token including Username

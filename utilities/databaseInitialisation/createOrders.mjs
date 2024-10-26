@@ -85,11 +85,11 @@ async function createTrackingRecord(orderID, orderStatuses, day) {
 
 // Function to create orders sequentially for each day in the past two years
 async function createOrdersForEachDay(productCount, orderStatuses, routeCount, customerCount) {
-    const days = 365 * 2; // Past two years
+    const days = 365 * 3; // Past two years
 
     for (let day = days; day >= 20; day--) {
         const orderDate = calculatePastDate(day);
-        const numOrders = getRandomInt(1, 5); // Random orders per day
+        const numOrders = getRandomInt(1, 10); // Random orders per day
 
         for (let i = 0; i < numOrders; i++) {
             await createOrder(orderDate, productCount, orderStatuses, day, routeCount, customerCount);

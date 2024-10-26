@@ -4,18 +4,11 @@ import passport from '../dashboard/Stratergy.mjs';
 import pool from '../../utilities/database/db.mjs';
 import adminRoutes from '../users/admin/admin.mjs';
 import managerRoute from '../users/manager/manager.mjs'
-import cors from "cors";
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
 
 dotenv.config();
 const router = express.Router();
-router.use(cors(
-    {
-        origin: ['http://localhost:3000','http://192.168.1.118:3000', 'http://192.168.109.29:3000'],
-        credentials: true
-    }
-));
 
 router.use(passport.initialize());
 

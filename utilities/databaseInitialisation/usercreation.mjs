@@ -54,7 +54,7 @@ async function createCustomer(data) {
 
 async function userCreation(cities) {
     //Generate 5 Admins
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 2; i++) {
         const fullName = faker.person.fullName();
         const randomNumber = Math.floor(Math.random() * 1000);
         const username = fullName.split(' ').join('').toLowerCase() + randomNumber;
@@ -71,7 +71,7 @@ async function userCreation(cities) {
         await createEmployee(data);
     }
 
-    //Generate 8 StoreManagers
+    //Generate 5 StoreManagers
     for (let i = 1; i <= cities.length; i++) {
         const fullName = faker.person.fullName();
         const randomNumber = Math.floor(Math.random() * 1000);
@@ -91,7 +91,7 @@ async function userCreation(cities) {
 
     //Generate Drivers and Assistants for each store
     for (let i = 1; i <= cities.length; i++) {
-        const DriverCount = Math.floor(Math.random() * 15) + 5;
+        const DriverCount = Math.floor(Math.random() * 10) + 10;
         for (let j = 0; j < DriverCount; j++) {
             const name = faker.person.fullName();
             const randomNumber = Math.floor(Math.random() * 1000);
@@ -129,7 +129,7 @@ async function userCreation(cities) {
     }
 
     //Generate randomNumberOfCustomers Customers
-    const randomNumberOfCustomers = Math.floor(Math.random() * (1000 - 100 + 1)) + 100;
+    const randomNumberOfCustomers = Math.floor(Math.random() * (500)) + 100; // Random number between 100 and 1000
     let createdCustomers = 0;
 
     const types = ['End', 'Retailer'];
