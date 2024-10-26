@@ -9,11 +9,12 @@ router.get('/test', (req, res) => {
 
 router.get('/quarterly-sales', async (req, res) => {
     try {
+        const storeID = req.user.StoreID;
         const query = `
             select YEAR(OrderDate) as Year, QUARTER(OrderDate) as Quarter, SUM(Value) as TotalRevenue
             from order_details_with_latest_status
-            where LatestStatus != 'Cancelled'
-               or LatestStatus != 'Attention'
+            where (LatestStatus != 'Cancelled'
+               or LatestStatus != 'Attention') and StoreID = ${storeID}
             group by YEAR(OrderDate), QUARTER(OrderDate)
             order by Year desc, Quarter desc
             limit 2;
@@ -33,11 +34,14 @@ router.get('/quarterly-sales', async (req, res) => {
 
 router.get('/trains-completed', async (req, res) => {
     try {
+        const storeID = req.user.StoreID
         const query = `
-            SELECT COUNT(CASE WHEN Status != 'Not Completed' THEN 1 END) AS completed,
-                   COUNT(TrainID)                                        AS total
+            SELECT COUNT(CASE WHEN Status = 'Completed' THEN 1 END)      AS completed,
+                   COUNT(CASE WHEN Status != 'Not Completed' then 1 end) AS total
             FROM trainschedule
-            WHERE DATE(ScheduleDateTime) = CURDATE();
+                     join train on trainschedule.TrainID = train.TrainID
+            WHERE DATE(ScheduleDateTime) = CURDATE()
+              and StoreID = ${storeID};
         `;
 
         const [rows] = await pool.query(query);
@@ -107,23 +111,42 @@ router.get('/today-sales', async (req, res) => {
 
 router.get('/train-statuses', async (req, res) => {
     try {
+        const storeID = req.user.StoreID;
         const query = `
-            select Status, count(TrainID) as count
-            from trainschedule
+            select Status, count(train.TrainID) as count
+            from trainschedule join train on trainschedule.TrainID = train.TrainID where StoreID = ${storeID}
             group by Status;
         `;
         const [rows] = await pool.query(query);
         res.json(rows);
     } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch train statuses'});
+    }
+});
+
+
+router.get('/shipment-statuses', async (req, res) => {
+    try {
+        const storeID = req.user.StoreID;
+        const query = `
+            select Status ,count(ShipmentID) as count from shipment join route on shipment.RouteID = route.RouteID where StoreID = ${storeID} group by Status;
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
         res.status(500).json({error: 'Failed to fetch train statuses'});
     }
 });
 
 router.get('/quarterly-orders', async (req, res) => {
+    const storeID = req.user.StoreID;
     try {
         const query = `
             select YEAR(OrderDate) as Year, QUARTER(OrderDate) as Quarter, COUNT(OrderID) as TotalOrders
             from order_details_with_latest_status
+            where StoreID = ${storeID}
             group by YEAR(OrderDate), QUARTER(OrderDate)
             order by Year desc, Quarter desc
             limit 2;
@@ -207,9 +230,9 @@ router.get('/get-ready-shipments/:storeID', async (req, res) => {
 });
 
 
-router.get('/get-available-assistants/:storeID', async (req, res) => {
+router.get('/get-available-assistants/', async (req, res) => {
     try {
-        console.log(`Fetching available assistants for store ${req.params.storeID}`);
+        console.log(`Fetching available assistants for store ${req.user.StoreID}`);
         const assistants = {"Available": 0, "Busy": 0};
         const query = `
             select Status, COUNT(EmployeeID) as count
@@ -219,7 +242,7 @@ router.get('/get-available-assistants/:storeID', async (req, res) => {
         `;
 
 
-        const [rows] = await pool.query(query, [req.params.storeID]);
+        const [rows] = await pool.query(query, [req.user.StoreID]);
         rows.forEach(row => {
             assistants[row.Status] = row.count;
         });
@@ -231,9 +254,9 @@ router.get('/get-available-assistants/:storeID', async (req, res) => {
     }
 });
 
-router.get('/get-available-drivers/:storeID', async (req, res) => {
+router.get('/get-available-drivers/', async (req, res) => {
    try {
-         console.log(`Fetching available drivers for store ${req.params.storeID}`);
+         console.log(`Fetching available drivers for store ${req.user.StoreID}`);
          const drivers = {"Available": 0, "Busy": 0};
          const query = `
                 select Status, COUNT(EmployeeID) as count
@@ -242,7 +265,7 @@ router.get('/get-available-drivers/:storeID', async (req, res) => {
                 group by Status;
          `;
 
-         const [rows] = await pool.query(query, [req.params.storeID]);
+         const [rows] = await pool.query(query, [req.user.StoreID]);
          rows.forEach(row => {
               drivers[row.Status] = row.count;
          });
@@ -254,9 +277,9 @@ router.get('/get-available-drivers/:storeID', async (req, res) => {
    }
 });
 
-router.get('/get-available-trucks/:storeID', async (req, res) => {
+router.get('/get-available-trucks/', async (req, res) => {
     try {
-        console.log(`Fetching available trucks for store ${req.params.storeID}`);
+        console.log(`Fetching available trucks for store ${req.user.StoreID}`);
         const trucks = {"Available": 0, "Busy": 0};
         const query = `
             select Status, COUNT(TruckID) as count
@@ -265,7 +288,7 @@ router.get('/get-available-trucks/:storeID', async (req, res) => {
             group by Status;
         `;
 
-        const [rows] = await pool.query(query, [req.params.storeID]);
+        const [rows] = await pool.query(query, [req.user.StoreID]);
         rows.forEach(row => {
             trucks[row.Status] = row.count;
         });

@@ -12,7 +12,8 @@ async function createEmployee(data) {
     const { name, username, address, password, StoreID, type, contact } = data;
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
-        const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID, Contact) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const query = `INSERT INTO employee (Name, Username, Address, PasswordHash, Type, StoreID, Contact)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)`;
         const [result] = await pool.query(query, [name, username, address, hashedPassword, type, StoreID, contact]);
 
         const id = result.insertId;
@@ -22,10 +23,12 @@ async function createEmployee(data) {
         const completedHours = '00:00:00';
 
         if (type === 'Driver') {
-            const driverQuery = `INSERT INTO Driver (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, ?, ?, 'Available')`;
+            const driverQuery = `INSERT INTO Driver (EmployeeID, WorkingHours, CompletedHours, Status)
+                                 VALUES (?, ?, ?, 'Available')`;
             await pool.query(driverQuery, [id, defaultWorkingHours, completedHours]);
         } else if (type === 'Assistant') {
-            const assistantQuery = `INSERT INTO Assistant (EmployeeID, WorkingHours, CompletedHours, Status) VALUES (?, ?, ?, 'Available')`;
+            const assistantQuery = `INSERT INTO Assistant (EmployeeID, WorkingHours, CompletedHours, Status)
+                                    VALUES (?, ?, ?, 'Available')`;
             await pool.query(assistantQuery, [id, defaultWorkingHours, completedHours]);
         }
         console.log(`Employee ${name} created successfully: username - ${username}, type - ${type}`);
@@ -40,7 +43,8 @@ async function createCustomer(data) {
 
     try {
         const hashedPassword = await bcrypt.hash(password, hashCount);
-        const query = `INSERT INTO customer (Username, Name, Address, Type, City, PasswordHash, Contact) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        const query = `INSERT INTO customer (Username, Name, Address, Type, City, PasswordHash, Contact)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)`;
         await pool.query(query, [username, name, address, type, city, hashedPassword, contact]);
         console.log(`Customer ${name} created successfully: username - ${username}, city - ${city}`);
     } catch (error) {

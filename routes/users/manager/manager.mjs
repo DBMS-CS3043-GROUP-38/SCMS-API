@@ -1,8 +1,6 @@
 import express from 'express';
 import cards from './cards.mjs'
 import charts from './charts.mjs'
-import pool from "../../../utilities/database/db.mjs";
-import {transformTopProducts, transformTopStores} from "../../../utilities/transformations.mjs";
 import tables from './tables.mjs';
 import buttons from "./buttons.mjs";
 import selectors from "./Selectors.mjs";
@@ -19,7 +17,7 @@ router.use('/searches', searches);
 
 //Routes
 router.get('/test', (req, res) => {
-    res.send('Admin dashboard route working');
+    res.send('Manager dashboard route working');
 });
 
 export default router;

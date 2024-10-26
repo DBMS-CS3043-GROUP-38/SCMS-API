@@ -206,6 +206,10 @@ CREATE TABLE `Order_Tracking`
 );
 
 
+-- Indexes
+CREATE INDEX idx_order_id ON `Order` (OrderID);
+create index idx_train_schedule_id on TrainSchedule (TrainScheduleID, Status);
+
 
 DELIMITER //
 # Triggers
@@ -292,57 +296,153 @@ BEGIN
 END;
 //
 
+CREATE TRIGGER before_train_contains_delete
+    BEFORE DELETE
+    ON Train_Contains
+    FOR EACH ROW
+BEGIN
+    DECLARE total_volume DECIMAL(10, 2);
+    DECLARE new_filled_capacity DECIMAL(10, 2);
+
+    -- Get the TotalVolume of the Order being removed
+    SELECT TotalVolume
+    INTO total_volume
+    FROM `Order`
+    WHERE OrderID = OLD.OrderID;
+
+    -- Calculate the new filled capacity by subtracting the total volume
+    SELECT FilledCapacity - total_volume
+    INTO new_filled_capacity
+    FROM TrainSchedule
+    WHERE TrainScheduleID = OLD.TrainScheduleID;
+
+    -- Update the FilledCapacity in the TrainSchedule table
+    UPDATE TrainSchedule
+    SET FilledCapacity = new_filled_capacity
+    WHERE TrainScheduleID = OLD.TrainScheduleID;
+END;
+//
+
+
+create trigger before_shipment_contains_insert
+    before insert
+    on Shipment_contains
+    for each row
+begin
+    declare total_volume decimal(10, 2);
+    declare capacity decimal(10, 2);
+    declare new_filled_capacity decimal(10, 2);
+
+    -- Get the TotalVolume of the Order being added
+    select TotalVolume
+    into total_volume
+    from `Order`
+    where OrderID = NEW.OrderID;
+
+    -- Get the Capacity of the Shipment
+    select Capacity
+    into capacity
+    from Shipment
+    where ShipmentID = NEW.ShipmentID;
+
+    -- Calculate the new filled capacity
+    select FilledCapacity + total_volume
+    into new_filled_capacity
+    from Shipment
+    where ShipmentID = NEW.ShipmentID;
+
+    -- Check if the new filled capacity exceeds the capacity
+    if new_filled_capacity > capacity then
+        signal sqlstate '45000'
+            set message_text = 'Error: Adding this order would exceed the shipment\'s capacity.';
+    else
+        -- Update the FilledCapacity in the Shipment table
+        update Shipment
+        set FilledCapacity = new_filled_capacity
+        where ShipmentID = NEW.ShipmentID;
+    end if;
+end;
+//
+
+create trigger before_shipment_contains_delete
+    before delete
+    on Shipment_contains
+    for each row
+begin
+    declare total_volume decimal(10, 2);
+    declare new_filled_capacity decimal(10, 2);
+
+    -- Get the TotalVolume of the Order being removed
+    select TotalVolume
+    into total_volume
+    from `Order`
+    where OrderID = OLD.OrderID;
+
+    -- Calculate the new filled capacity by subtracting the total volume
+    select FilledCapacity - total_volume
+    into new_filled_capacity
+    from Shipment
+    where ShipmentID = OLD.ShipmentID;
+
+    -- Update the FilledCapacity in the Shipment table
+    update Shipment
+    set FilledCapacity = new_filled_capacity
+    where ShipmentID = OLD.ShipmentID;
+end;
+//
+
 
 # Views
 
 create view Driver_Details_With_Employee as
-    select d.DriverID,
-           d.EmployeeID,
-           e.Name,
-           e.Username,
-           e.Address,
-           e.Contact,
-           e.Type,
-           d.WorkingHours,
-           d.CompletedHours,
-           d.Status
-    from driver d
-             join employee e on d.EmployeeID = e.EmployeeID;
+select d.DriverID,
+       d.EmployeeID,
+       e.Name,
+       e.Username,
+       e.StoreID,
+       e.Address,
+       e.Contact,
+       e.Type,
+       d.WorkingHours,
+       d.CompletedHours,
+       d.Status
+from driver d
+         join employee e on d.EmployeeID = e.EmployeeID;
 //
 
 
 create view Assistant_Details_With_Employee as
-    select a.AssistantID,
-           a.EmployeeID,
-           e.Name,
-           e.Username,
-           e.Address,
-           e.Contact,
-           e.Type,
-           a.WorkingHours,
-           a.CompletedHours,
-           a.Status
-    from assistant a
-             join employee e on a.EmployeeID = e.EmployeeID;
+select a.AssistantID,
+       a.EmployeeID,
+       e.Name,
+       e.Username,
+       e.StoreID,
+       e.Address,
+       e.Contact,
+       e.Type,
+       a.WorkingHours,
+       a.CompletedHours,
+       a.Status
+from assistant a
+         join employee e on a.EmployeeID = e.EmployeeID;
 //
 
 
 create view truck_schedule_with_details as
-    select
-        ts.TruckScheduleID,
-        ts.StoreID,
-        ts.ShipmentID,
-        ts.ScheduleDateTime,
-        ts.RouteID,
-        ts.AssistantID,
-        ts.DriverID,
-        ts.TruckID,
-        ts.Hours,
-        ts.Status,
-        s.City as StoreCity,
-        a.Name as AssistantName,
-        d.Name as DriverName,
-        t.LicencePlate
+select ts.TruckScheduleID,
+       ts.StoreID,
+       ts.ShipmentID,
+       ts.ScheduleDateTime,
+       ts.RouteID,
+       ts.AssistantID,
+       ts.DriverID,
+       ts.TruckID,
+       ts.Hours,
+       ts.Status,
+       s.City as StoreCity,
+       a.Name as AssistantName,
+       d.Name as DriverName,
+       t.LicencePlate
 from truckschedule ts
          join truck t on ts.TruckID = t.TruckID
          join route r on ts.RouteID = r.RouteID
@@ -473,6 +573,7 @@ select c.CustomerID,
        c.Address,
        c.Type,
        c.City,
+       c.Contact,
        count(o.OrderID) as TotalOrders,
        sum(o.Value)     as TotalRevenue
 from Customer c
@@ -483,28 +584,34 @@ group by c.CustomerID;
 
 # to get the daily store sales (sales on a date for each store)
 CREATE VIEW v_daily_store_sales AS
-SELECT 
-    s.StoreID,
-    s.City AS StoreCity,
-    DATE(o.OrderDate) AS SaleDate,
-    COUNT(o.OrderID) AS NumberOfOrders,
-    SUM(o.Value) AS TotalRevenue
-FROM 
-    `Order` o
-JOIN 
-    Route r ON o.RouteID = r.RouteID
-JOIN 
-    Store s ON r.StoreID = s.StoreID
-JOIN 
-    Order_Tracking ot ON o.OrderID = ot.OrderID
-WHERE 
-    ot.Status NOT IN ('Cancelled', 'Attention')
-GROUP BY 
-    s.StoreID, s.City, DATE(o.OrderDate)
-ORDER BY 
-    SaleDate DESC, TotalRevenue DESC
+SELECT s.StoreID,
+       s.City            AS StoreCity,
+       DATE(o.OrderDate) AS SaleDate,
+       COUNT(o.OrderID)  AS NumberOfOrders,
+       SUM(o.Value)      AS TotalRevenue
+FROM `Order` o
+         JOIN
+     Route r ON o.RouteID = r.RouteID
+         JOIN
+     Store s ON r.StoreID = s.StoreID
+         JOIN
+     Order_Tracking ot ON o.OrderID = ot.OrderID
+WHERE ot.Status NOT IN ('Cancelled', 'Attention')
+GROUP BY s.StoreID, s.City, DATE(o.OrderDate)
+ORDER BY SaleDate DESC, TotalRevenue DESC
 ;
 //
+
+
+CREATE VIEW Truck_Distances AS
+SELECT ts.TruckID,
+       SUM(r.Distance) AS TotalDistance
+FROM TruckSchedule ts
+         JOIN Route r ON ts.RouteID = r.RouteID
+WHERE ts.Status = 'Completed'
+GROUP BY ts.TruckID;
+//
+
 
 # Functions
 
@@ -556,7 +663,7 @@ BEGIN
         END IF;
 
         -- Add schedules for this train
-        SET date_ptr = start_date;
+        SET date_ptr = DATE_ADD(start_date, INTERVAL 1 DAY);
         WHILE date_ptr <= end_date
             DO
                 IF DAYNAME(date_ptr) = train_day THEN
@@ -575,87 +682,38 @@ END;
 //
 
 
-
-# View for truck distances
-
-CREATE VIEW Truck_Distances AS
-SELECT 
-    ts.TruckID,
-    SUM(r.Distance) AS TotalDistance
-FROM
-    TruckSchedule ts
-    JOIN Route r ON ts.RouteID = r.RouteID
-WHERE
-    ts.Status = 'Completed'
-GROUP BY
-    ts.TruckID;
-//
-
-
--- Trigger to check and update remaining capacity of shipment when adding orders
-
-
-CREATE TRIGGER check_shipment_capacity BEFORE INSERT ON Shipment_contains
-FOR EACH ROW
-BEGIN
-    DECLARE shipmentCapacity DECIMAL(10, 2);
-    DECLARE filledCapacity DECIMAL(10, 2);
-    DECLARE orderVolume DECIMAL(10, 2);
-
-    -- Get the shipment's capacity and filled capacity
-    SELECT Capacity, FilledCapacity INTO shipmentCapacity, filledCapacity 
-    FROM Shipment 
-    WHERE ShipmentID = NEW.ShipmentID;
-
-    -- Get the total volume of the order being added
-    SELECT TotalVolume INTO orderVolume 
-    FROM `Order` 
-    WHERE OrderID = NEW.OrderID;
-
-    -- Check if adding the order would exceed the capacity
-    IF (filledCapacity + orderVolume) > shipmentCapacity THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Adding this order exceeds the shipment capacity';
-    ELSE
-        -- Update the filled capacity
-        UPDATE Shipment
-        SET FilledCapacity = filledCapacity + orderVolume
-        WHERE ShipmentID = NEW.ShipmentID;
-    END IF;
-END //
-
-
 -- Trigger to check work hours for driver and assistant when creating a truck schedule
-CREATE TRIGGER check_schedule_work_hours BEFORE INSERT ON TruckSchedule
-FOR EACH ROW
-BEGIN
-    DECLARE driverWorkingHours INT;
-    DECLARE driverCompletedHours INT;
-    DECLARE assistantWorkingHours INT;
-    DECLARE assistantCompletedHours INT;
-    DECLARE scheduleHours TIME;
+-- CREATE TRIGGER check_schedule_work_hours BEFORE INSERT ON TruckSchedule
+-- FOR EACH ROW
+-- BEGIN
+--     DECLARE driverWorkingHours INT;
+--     DECLARE driverCompletedHours INT;
+--     DECLARE assistantWorkingHours INT;
+--     DECLARE assistantCompletedHours INT;
+--     DECLARE scheduleHours TIME;
 
-    -- Get working and completed hours for the driver
-    SELECT WorkingHours, CompletedHours INTO driverWorkingHours, driverCompletedHours
-    FROM Driver
-    WHERE DriverID = NEW.DriverID;
+--     -- Get working and completed hours for the driver
+--     SELECT WorkingHours, CompletedHours INTO driverWorkingHours, driverCompletedHours
+--     FROM Driver
+--     WHERE DriverID = NEW.DriverID;
 
-    -- Get working and completed hours for the assistant
-    SELECT WorkingHours, CompletedHours INTO assistantWorkingHours, assistantCompletedHours
-    FROM Assistant
-    WHERE AssistantID = NEW.AssistantID;
+--     -- Get working and completed hours for the assistant
+--     SELECT WorkingHours, CompletedHours INTO assistantWorkingHours, assistantCompletedHours
+--     FROM Assistant
+--     WHERE AssistantID = NEW.AssistantID;
 
-    -- Get the hours for the schedule
-    SET scheduleHours = NEW.Hours;
+--     -- Get the hours for the schedule
+--     SET scheduleHours = NEW.Hours;
 
-    -- Check if the driver's hours exceed
-    IF (driverCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > driverWorkingHours THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds driver\'s available work hours';
-    END IF;
+--     -- Check if the driver's hours exceed
+--     IF (driverCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > driverWorkingHours THEN
+--         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds driver\'s available work hours';
+--     END IF;
 
-    -- Check if the assistant's hours exceed
-    IF (assistantCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > assistantWorkingHours THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds assistant\'s available work hours';
-    END IF;
-END //
+--     -- Check if the assistant's hours exceed
+--     IF (assistantCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > assistantWorkingHours THEN
+--         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds assistant\'s available work hours';
+--     END IF;
+-- END //
 
 DELIMITER ;

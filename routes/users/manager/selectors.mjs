@@ -10,6 +10,7 @@ router.get('/test', (req, res) => {
 
 router.get('/today-trains', async (req, res) => {
     try {
+        const StoreID =  req.user.StoreID;
         const query = `
             select 
                 TrainScheduleID as trainID,
@@ -17,7 +18,7 @@ router.get('/today-trains', async (req, res) => {
                 StoreCity as Destination
             from 
                 train_schedule_with_destinations 
-            where DATE(ScheduleDateTime) <= CURDATE() and Status = 'Not Completed' order by ScheduleDateTime;
+            where DATE(ScheduleDateTime) <= CURDATE() and Status = 'In Progress' and StoreID = ${StoreID} order by ScheduleDateTime;
         `;
 
         const [rows] = await pool.query(query);
@@ -72,20 +73,6 @@ router.get('/get-stores', async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({error: 'Failed to fetch stores'});
-    }
-});
-
-router.get('/product-categories', async (req, res) => {
-    try {
-        const query = `
-            select distinct Type as category
-            from product;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({error: 'Failed to fetch product categories'});
     }
 });
 

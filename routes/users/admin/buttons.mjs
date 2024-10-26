@@ -23,159 +23,182 @@ router.post('/schedule-trains', async (req, res) => {
 router.post('/schedule-orders', async (req, res) => {
     let ScheduledOrders = 0;
     let message = '';
-    try {
+    const connection = await pool.getConnection();
 
-        const [orders] = await pool.query(`select *
-                                           from order_details_with_latest_status
-                                           where LatestStatus = 'Pending'`);
-        const [trains] = await pool.query(`select *
-                                           from train_schedule_with_destinations
-                                           where Status = 'Not Completed'
-                                           order by ScheduleDateTime`);
+    try {
+        await connection.beginTransaction();
+
+        const [orders] = await connection.query(`
+            SELECT *
+            FROM order_details_with_latest_status
+            WHERE LatestStatus = 'Pending'
+        `);
+        const [trains] = await connection.query(`
+            SELECT *
+            FROM train_schedule_with_destinations
+            WHERE Status = 'Not Completed'
+            ORDER BY ScheduleDateTime
+        `);
+
         const TotalOrders = orders.length;
         const TotalTrains = trains.length;
 
-        if (orders.length === 0 || trains.length === 0) {
-            return res.json({message: 'No orders or trains to schedule', ScheduledOrders: 0});
+        if (TotalOrders === 0 || TotalTrains === 0) {
+            return res.json({ message: 'No orders or trains to schedule', ScheduledOrders: 0 });
         }
 
-        //Looping through each order and assigning it to a train
+        // Looping through each order and assigning it to a train
         for (let i = 0; i < TotalOrders; i++) {
-            console.log(`Processing order ${orders[i].OrderID} with volume ${orders[i].TotalVolume}`);
             for (let j = 0; j < TotalTrains; j++) {
-                //Break if train is not to destination
+                // Break if train is not to destination
                 if (orders[i].StoreCity !== trains[j].StoreCity) {
-                    console.log(`Order ${orders[i].OrderID} is not for train ${trains[j].TrainScheduleID}`);
                     continue;
                 }
-                console.log(`Checking train ${trains[j].TrainScheduleID} with remaining capacity ${trains[j].RemainingCapacity}`);
-                if (parseFloat(orders[i].TotalVolume) <= parseFloat(trains[j].RemainingCapacity)) {
-                    console.log(`Order ${orders[i].OrderID} can be scheduled to train ${trains[j].TrainScheduleID}`);
-                    const changeStatus = `
-                        insert into order_tracking (OrderID, TimeStamp, Status) value (${orders[i].OrderID}, now(), 'PendingDispatch');
-                    `;
-                    await pool.query(changeStatus);
-                    const assignATrain = `
-                        insert into train_contains (TrainScheduleID, OrderID) VALUE (${trains[j].TrainScheduleID}, ${orders[i].OrderID});
-                    `;
-                    await pool.query(assignATrain);
-                    ScheduledOrders++;
-                    console.log(`Order ${orders[i].OrderID} scheduled to train ${trains[j].TrainScheduleID}`);
-                    //Update the remaining capacity of the train in local variable
-                    trains[j].RemainingCapacity = (parseFloat(trains[j].RemainingCapacity) - parseFloat(orders[i].TotalVolume)).toFixed(2);
 
-                    break;
+                if (parseFloat(orders[i].TotalVolume) <= parseFloat(trains[j].RemainingCapacity)) {
+                    const changeStatus = `
+                        INSERT INTO order_tracking (OrderID, TimeStamp, Status)
+                        VALUES (?, NOW(), 'PendingDispatch')
+                    `;
+                    await connection.query(changeStatus, [orders[i].OrderID]);
+
+                    const assignATrain = `
+                        INSERT INTO train_contains (TrainScheduleID, OrderID)
+                        VALUES (?, ?)
+                    `;
+                    await connection.query(assignATrain, [trains[j].TrainScheduleID, orders[i].OrderID]);
+                    ScheduledOrders++;
+
+                    // Update the remaining capacity of the train
+                    trains[j].RemainingCapacity = (parseFloat(trains[j].RemainingCapacity) - parseFloat(orders[i].TotalVolume)).toFixed(2);
+                    break; // Break the inner loop since the order has been scheduled
                 }
-                console.log(`Order ${orders[i].OrderID} cannot be scheduled to train ${trains[j].TrainScheduleID}`);
             }
         }
-        message = 'No orders could be scheduled might be due to insufficient capacity';
+
         if (ScheduledOrders > 0) {
-            message = `${ScheduledOrders} out of ${TotalOrders} orders scheduled successfully`
+            message = `${ScheduledOrders} out of ${TotalOrders} orders scheduled successfully.`;
+        } else {
+            message = 'No orders could be scheduled; might be due to insufficient capacity.';
         }
-        res.json({message, ScheduledOrders});
+
+        await connection.commit(); // Commit transaction
+        res.json({ message, ScheduledOrders });
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to schedule orders'});
+        await connection.rollback(); // Rollback transaction on error
+        res.status(500).json({ error: 'Failed to schedule orders' });
+    } finally {
+        connection.release(); // Always release the connection back to the pool
     }
 });
 
 router.post('/dispatch-train/:trainID', async (req, res) => {
-    const {trainID} = req.params;
+    const { trainID } = req.params;
     let dispatchedOrders = 0;
     let message = '';
+    const connection = await pool.getConnection();
+
     console.log(`Dispatching train ${trainID}`);
+
     try {
+        await connection.beginTransaction();
+
         const getOrders = `
-            select OrderID
-            from train_contains
-            where TrainScheduleID = ${trainID};
+            SELECT OrderID
+            FROM train_contains
+            WHERE TrainScheduleID = ?
         `;
+        const [orders] = await connection.query(getOrders, [trainID]);
+        const TotalOrders = orders.length;
+
         const setOrderStatus = `
-            insert into order_tracking(OrderID, TimeStamp, Status) VALUE (?, now(), 'InTrain');
+            INSERT INTO order_tracking (OrderID, TimeStamp, Status)
+            VALUES (?, NOW(), 'InTrain')
         `;
         const setTrainStatus = `
-            update trainschedule
-            set Status = 'In Progress'
-            where TrainScheduleID = ${trainID};
+            UPDATE trainschedule
+            SET Status = 'In Progress'
+            WHERE TrainScheduleID = ?
         `;
 
-        const [orders] = await pool.query(getOrders);
-        const TotalOrders = orders.length;
         for (let i = 0; i < TotalOrders; i++) {
-            await pool.query(setOrderStatus, [orders[i].OrderID]);
+            await connection.query(setOrderStatus, [orders[i].OrderID]);
             dispatchedOrders++;
         }
-        await pool.query(setTrainStatus);
 
-        message = `Train ${trainID} dispatched with No orders`;
+        await connection.query(setTrainStatus, [trainID]);
+
+        message = `Train ${trainID} dispatched with no orders.`;
         if (dispatchedOrders > 0) {
-            message = `${dispatchedOrders} out of ${TotalOrders} orders dispatched with trainSchedule ${trainID}`;
+            message = `${dispatchedOrders} out of ${TotalOrders} orders dispatched with train schedule ${trainID}.`;
         }
-        res.json({message, dispatchedOrders});
+
+        await connection.commit(); // Commit transaction
+        res.json({ message, dispatchedOrders });
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to dispatch train'});
+        await connection.rollback(); // Rollback transaction on error
+        res.status(500).json({ error: 'Failed to dispatch train' });
+    } finally {
+        connection.release(); // Always release the connection back to the pool
     }
 });
 
 
 router.patch('/report-order/:orderID', async (req, res) => {
+    const connection = await pool.getConnection(); // Get a connection for transaction
     try {
-        let message = '';
-        const {orderID} = req.params;
+        let message = [];
+        const { orderID } = req.params;
+
+        await connection.beginTransaction(); // Start transaction
+
         const orderInfo = `
-            select TotalVolume, ShipmentID, TrainScheduleID
-            from order_details_with_latest_status
-            where OrderID = ${orderID}
-              and LatestStatus not in ('Attention', 'Delivered', 'Cancelled');
+            SELECT TotalVolume, ShipmentID, TrainScheduleID
+            FROM order_details_with_latest_status
+            WHERE OrderID = ?
+              AND LatestStatus NOT IN ('Attention', 'Delivered', 'Cancelled');
         `;
-        const tracking =
-            `            insert into order_tracking (OrderID, TimeStamp, Status) value (${orderID}, now(), 'Attention');
-            `;
-        const removeTrain =
-            `delete
-             from train_contains
-             where OrderID = ${orderID};`
-        ;
-        const removeShipment =
-            `delete
-             from shipment_contains
-             where OrderID = ${orderID};`
-        ;
-        const updateSpaceTrain =
-            `update trainschedule
-             set FilledCapacity = FilledCapacity - ?
-             where TrainScheduleID = ?;`;
+        const [rows] = await connection.query(orderInfo, [orderID]);
 
-        const updateSpaceShipment =
-            `update shipment
-             set FilledCapacity = FilledCapacity - ?
-             where ShipmentID = ?;`;
-
-
-        const [rows] = await pool.query(orderInfo);
         if (rows.length === 0) {
-            return res.json({message: 'Order not found'});
+            await connection.rollback(); // Rollback if no eligible order is found
+            return res.json({ message: 'Order not found or not eligible' });
         }
+
+        // Delete from train_contains and shipment_contains, triggers handle capacity
         if (rows[0].TrainScheduleID !== null) {
-            await pool.query(updateSpaceTrain, [rows[0].TotalVolume, rows[0].TrainScheduleID]);
-            await pool.query(removeTrain);
-            message = message + 'Order removed from train \n';
+            const removeTrain = `DELETE FROM train_contains WHERE OrderID = ?;`;
+            await connection.query(removeTrain, [orderID]);
+            message.push('Order removed from train');
         }
+
         if (rows[0].ShipmentID !== null) {
-            await pool.query(updateSpaceShipment, [rows[0].TotalVolume, rows[0].ShipmentID]);
-            await pool.query(removeShipment);
-            message = message + 'Order removed from shipment \n';
+            const removeShipment = `DELETE FROM shipment_contains WHERE OrderID = ?;`;
+            await connection.query(removeShipment, [orderID]);
+            message.push('Order removed from shipment');
         }
-        await pool.query(tracking);
-        message = message + 'Order status changed to Attention';
-        res.json({message});
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({error: 'Failed to update order status'});
+
+        // Update order status in order_tracking table
+        const tracking = `
+            INSERT INTO order_tracking (OrderID, TimeStamp, Status)
+            VALUES (?, NOW(), 'Attention');
+        `;
+        await connection.query(tracking, [orderID]);
+        message.push('Order status changed to Attention');
+
+        await connection.commit(); // Commit transaction
+        res.json({ message: message.join(', ') }); // Send message as comma-separated string
+    } catch (error) {
+        await connection.rollback(); // Rollback transaction on error
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update order status' });
+    } finally {
+        connection.release(); // Release connection back to pool
     }
 });
+
 
 
 router.patch('/cancel-order/:orderID', async (req, res) => {

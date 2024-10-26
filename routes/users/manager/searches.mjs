@@ -10,6 +10,7 @@ router.get('/test', (req, res) => {
 
 router.get('/order/:id', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const id = req.params.id;
         if (!id) {
             res.status(400).json({error: 'Order ID not provided'});
@@ -41,10 +42,10 @@ router.get('/order/:id', async (req, res) => {
             from order_details_with_latest_status
                      left outer join trainschedule
                           on order_details_with_latest_status.TrainScheduleID = trainschedule.TrainScheduleID
-            where OrderID = ?;
+            where OrderID = ? and StoreID = ?;
         `;
 
-        const [rows] = await pool.query(query, [id]);
+        const [rows] = await pool.query(query, [id, StoreID]);
         if (rows.length === 0) {
             res.status(404).json({error: 'Order not found'});
         }
@@ -333,39 +334,6 @@ router.get('/truck', async (req, res) => {
     } catch (error) {
         console.error('Database query failed:', error);
         res.status(500).json({error: 'Database query failed'});
-    }
-})
-
-router.get('/product/:id', async (req, res) => {
-    try {
-        const id = req.params.id;
-        const query = `
-            select ProductID as id, Name as name, Type as category, Price as price
-            from product
-            where ProductID = ${id};
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({error: 'Failed to fetch products'});
-    }
-})
-
-router.get('/product-sales/:id', async (req, res) => {
-    try {
-        const id = req.params.id;
-        const query = `
-            SELECT CONCAT(Year, ' - ', Quarter) AS Quarter, TotalRevenue
-            FROM quarterly_product_report
-            WHERE ProductID = ${id}
-            ORDER BY Year, Quarter;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
-    } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch product sales'});
     }
 })
 

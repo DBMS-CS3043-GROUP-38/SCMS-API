@@ -30,9 +30,10 @@ router.get('/revenue-past', async (req, res) => {
 
 router.get('/order-statuses', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select count(*) as count, LatestStatus as status
-            from order_details_with_latest_status
+            from order_details_with_latest_status where StoreID = ${StoreID}
             group by LatestStatus;
         `;
         const [rows] = await pool.query(query);
@@ -102,30 +103,6 @@ router.get('/customer-distribution', async (req, res) => {
     } catch (e) {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch customer distribution'});
-    }
-});
-
-router.get('/route-sales/:storeID', async (req, res) => {
-    try {
-        const {storeID} = req.params;
-        const query = `
-            SELECT
-                CONCAT(YEAR(OrderDate), '-Q', QUARTER(OrderDate)) as quarter,
-                RouteID,
-                SUM(Value) as revenue
-            FROM order_details_with_latest_status
-            WHERE LatestStatus NOT LIKE 'Cancelled'
-              AND StoreID = ${storeID}
-            GROUP BY quarter, RouteID
-            ORDER BY quarter;
-        `;
-
-        const [rows] = await pool.query(query);
-        console.log(`Fetched route sales: ${rows.length} rows`);
-        res.json(rows);
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({error: 'Failed to fetch route sales'});
     }
 });
 

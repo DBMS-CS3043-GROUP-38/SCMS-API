@@ -9,6 +9,7 @@ router.get('/test', (req, res) => {
 
 router.get('/trains-today', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID
         const query = `
             select TrainScheduleID  as id,
                    StoreCity        as destination,
@@ -16,7 +17,7 @@ router.get('/trains-today', async (req, res) => {
                    FullCapacity     as fullCapacity,
                    ScheduleDateTime as time
             from train_schedule_with_destinations
-            where DATE(ScheduleDateTime) = CURDATE()
+            where DATE(ScheduleDateTime) = CURDATE() and StoreID = ${StoreID}
             order by ScheduleDateTime;
         `
         const [rows] = await pool.query(query);
@@ -46,44 +47,6 @@ router.get('/best-products-quarter', async (req, res) => {
         res.status(500).json({error: 'Failed to fetch best product of the quarter'});
     }
 });
-
-router.get('/products/:type', async (req, res) => {
-    try {
-        const type = req.params.type;
-        var query;
-        if (type === 'All') {
-            query = `
-                select product.ProductID                    as 'id',
-
-                       product.Name                         as 'Product Name',
-                       product.Price                        as 'Price',
-                       COUNT(contains.OrderID)              as 'Total Orders',
-                       SUM(contains.Amount * product.Price) as 'Total Revenue'
-                from product
-                         join contains on product.ProductID = contains.ProductID
-                group by product.ProductID;
-            `;
-        } else {
-            query = `
-                select product.ProductID                    as 'id',
-                       product.Name                         as 'Product Name',
-                       product.Price                        as 'Price',
-                       COUNT(contains.OrderID)              as 'Total Orders',
-                       SUM(contains.Amount * product.Price) as 'Total Revenue'
-                from product
-                         join contains on product.ProductID = contains.ProductID
-                where product.Type = '${type}'
-                group by product.ProductID;
-            `;
-        }
-        const [rows] = await pool.query(query);
-        res.json(rows);
-    } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch products'});
-    }
-})
-
 
 router.get('/weekly-trains', async (req, res) => {
     try {
@@ -131,6 +94,7 @@ router.get('/scheduled-trains', async (req, res) => {
 
 router.get('/active-trains', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select TrainID          as id,
                    TrainScheduleID  as scheduleID,
@@ -140,7 +104,8 @@ router.get('/active-trains', async (req, res) => {
                    ScheduleDateTime as time,
                    Status           as status
             from train_schedule_with_destinations
-            where Status != 'Completed'
+            where StoreID = ${StoreID}
+              and Status != 'Completed'
             order by ScheduleDateTime;
         `
         const [rows] = await pool.query(query);
@@ -151,8 +116,33 @@ router.get('/active-trains', async (req, res) => {
     }
 })
 
-router.get('/pending-orders-list', async (req, res) => {
+router.get('/active-shipments', async (req, res) => {
+  try {
+      const StoreID = req.user.StoreID;
+      const query = `
+          select ShipmentID     as id,
+                 route.RouteID  as routeID,
+                 FilledCapacity as capacityFilled,
+                 Capacity       as fullCapacity,
+                 CreatedDate    as createdData,
+                 Status         as status
+          from shipment
+                   join route on shipment.RouteID = route.RouteID
+          where StoreID = ${StoreID}
+            and Status != 'Completed'
+          order by CreatedDate;
+      `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+  }  catch (e) {
+      console.log(e);
+      res.status(500).json({error: 'Failed to fetch active shipments'});
+  }
+})
+
+router.get('/instore-orders-list', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select OrderID                            as OrderID,
                    DATE_FORMAT(OrderDate, '%Y-%m-%d') as OrderDate,
@@ -161,7 +151,7 @@ router.get('/pending-orders-list', async (req, res) => {
                    StoreCity                          as StoreCity,
                    RouteID                            as RouteID
             from order_details_with_latest_status
-            where LatestStatus = 'Pending'
+            where LatestStatus = 'InStore' and StoreID = ${StoreID};
         `;
         const [rows] = await pool.query(query);
 
@@ -191,6 +181,7 @@ router.get('/orders-by-train/:trainSchID', async (req, res) => {
 
 router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const {year, quarter} = req.params;
         const query = `
             select ProductID    as ProductID,
@@ -200,7 +191,8 @@ router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
             from quarterly_product_report
             where Year = ${year}
               and Quarter = ${quarter}
-            order by revenue desc;
+            order by revenue desc
+            limit 100;
         `;
         const [rows] = await pool.query(query);
         res.json(rows);
@@ -212,6 +204,7 @@ router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
 
 router.get('/top-customers-quarter/:year/:quarter', async (req, res) => {
     try {
+        const storeID = req.user.StoreID;
         const {year, quarter} = req.params;
         const query = `
             select c.CustomerID as CustomerID,
@@ -220,7 +213,8 @@ router.get('/top-customers-quarter/:year/:quarter', async (req, res) => {
                    SUM(o.Value) as Revenue
             from (select *
                   from order_details_with_latest_status
-                  where YEAR(OrderDate) = ${year}
+                  where StoreID = ${storeID}
+                  and YEAR(OrderDate) = ${year}
                     and QUARTER(OrderDate) = ${quarter}
                     and LatestStatus not in ('Cancelled', 'Attention')) o
                      join customer c on o.CustomerID = c.CustomerID
@@ -301,13 +295,14 @@ router.get('/train-assigned-orders', async (req, res) => {
 
 router.get('/orders-in-train', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `select tc.OrderID                                      as OrderID,
                               ts.TrainScheduleID                              as TrainScheduleID,
                               ts.StoreCity                                    as Destination,
                               DATE_FORMAT(ts.ScheduleDateTime, '%e-%b-%y %T') as TrainTime
                        from (select *
                              from order_details_with_latest_status
-                             where LatestStatus = 'InTrain') as trainAssigned
+                             where LatestStatus = 'InTrain' and StoreID = ${StoreID}) as trainAssigned
                                 join train_contains tc on trainAssigned.OrderID = tc.OrderID
                                 join train_schedule_with_destinations ts on tc.TrainScheduleID = ts.TrainScheduleID;
         `;
@@ -323,10 +318,12 @@ router.get('/orders-in-train', async (req, res) => {
 
 router.get('/orders-in-store', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select OrderID, StoreID, StoreCity, RouteID
             from order_details_with_latest_status
-            where LatestStatus = 'InStore';
+            where StoreID = ${StoreID}
+                and LatestStatus = 'InStore';
         `
 
         const [rows] = await pool.query(query);
@@ -340,10 +337,12 @@ router.get('/orders-in-store', async (req, res) => {
 
 router.get('/orders-in-shipment', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select OrderID, StoreID, ShipmentID, ShipmentStatus
             from order_details_with_latest_status
-            where LatestStatus = 'InShipment';
+            where StoreID = ${StoreID}
+               and LatestStatus = 'InShipment';
         `
 
 
@@ -358,10 +357,12 @@ router.get('/orders-in-shipment', async (req, res) => {
 
 router.get('/orders-in-truck', async (req, res) => {
     try {
+        const StoreID = req.user.StoreID;
         const query = `
             select OrderID, StoreID, TruckID, AssistantID, DriverID
             from order_details_with_latest_status
-            where LatestStatus = 'InTruck';
+            where StoreID = ${StoreID}
+              and LatestStatus = 'InTruck';
         `
 
 
@@ -423,14 +424,12 @@ router.get('/store-data', async (req, res) => {
     }
 });
 
-router.get('/manager-data', async (req, res) => {
+router.get('/admin-data', async (req, res) => {
     try {
-
         const query = `
-            select e.StoreID, s.City, EmployeeID, Name, Contact, Address
-            from employee e
-                     join store s on e.StoreID = s.StoreID
-            where Type = 'StoreManager';
+            select EmployeeID, Name, Contact, Address
+            from employee 
+            where Type = 'Admin';
         `
         const [rows] = await pool.query(query);
         res.json(rows);
@@ -454,6 +453,92 @@ router.get('/top-customers', async (req, res) => {
     } catch (e) {
         console.log(e);
         res.status(500).json({error: 'Failed to fetch top customers'});
+    }
+});
+
+router.get('/drivers', async (req , res) => {
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select DriverID       AS 'Driver ID',
+                   Name           AS 'Driver Name',
+                   Contact        AS 'Phone',
+                   Status         AS 'Availability',
+                   CompletedHours AS 'CompletedHours',
+                   WorkingHours   AS 'WorkHours'
+            from driver_details_with_employee where StoreID = ${StoreID};
+        `;
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch drivers'});
+    }
+});
+
+
+router.get('/assistants', async (req , res) => {
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select AssistantID    AS 'Assistant ID',
+                   Name           AS 'Assistant Name',
+                   StoreID        AS 'Store ID',
+                   Contact        AS 'Phone',
+                   Status         AS 'Availability',
+                   CompletedHours AS 'CompletedHours',
+                   WorkingHours   AS 'WorkHours'
+            from assistant_details_with_employee where StoreID = ${StoreID};
+        `;
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch assistant'});
+    }
+});
+
+router.get('/trucks', async (req , res) => {
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select td.TruckID    AS 'Truck ID',
+                   LicencePlate  AS 'Licence Plate',
+                   TotalDistance AS 'Total Distance(KM)',
+                   Status        as 'Availability'
+            from truck
+                     join truck_distances td on truck.TruckID = td.TruckID
+            where StoreID = ${StoreID}
+            order by td.TruckID;
+        `;
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch trucks'});
+    }
+});
+
+router.get('/routes', async (req , res) => {
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select RouteID       AS 'Route ID',
+                   StoreID       AS 'Store ID',
+                   Distance      AS 'Distance(KM)',
+                   Time_duration AS 'Time Duration',
+                   Description   AS 'Description'
+            from route where StoreID = ${StoreID};
+        `;
+
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch routes'});
     }
 });
 
