@@ -2,6 +2,10 @@ import express from "express";
 import dotenv from "dotenv";
 import dashboardRoutes from './routes/dashboard/dashboard.mjs';
 import itemsRouter from './routes/users/customer/displayItems.mjs';
+import authRoutes from './routes/auth.mjs';
+
+
+
 dotenv.config();
 
 const app = express();
@@ -15,7 +19,7 @@ app.use('/dashboard', dashboardRoutes);
 
 //Routes in customer UI
 app.use('/api', itemsRouter);
-
+app.use('/api/auth', authRoutes);
 
 
 app.get('/test', (req, res) => {
