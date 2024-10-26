@@ -53,7 +53,7 @@ CREATE TABLE `Product`
     `Name`                     VARCHAR(100)   NOT NULL,
     `TrainCapacityConsumption` DECIMAL(10, 2) NOT NULL,
     `Price`                    DECIMAL(10, 2) NOT NULL,
-    `Type`                     ENUM ('Fashion', 'Home Appliances', 'Furniture', 'Electronics'),
+    `Type`                     ENUM ('Clothes', 'Groceries', 'Electronics', 'Cosmetics', 'Others'),
     PRIMARY KEY (`ProductID`)
 );
 

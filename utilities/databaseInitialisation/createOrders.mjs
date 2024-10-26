@@ -1,4 +1,4 @@
-import pool from '../database/db.mjs';
+import pool from "../database/db.mjs";
 
 // Function to get a random integer within a range
 function getRandomInt(min, max) {
@@ -9,7 +9,7 @@ function getRandomInt(min, max) {
 function calculatePastDate(daysAgo) {
     const date = new Date();
     date.setDate(date.getDate() - daysAgo);
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    return date.toISOString().split("T")[0]; // YYYY-MM-DD format
 }
 
 function calculatePastTimeStamp(daysAgo) {
@@ -17,23 +17,34 @@ function calculatePastTimeStamp(daysAgo) {
     date.setDate(date.getDate() - daysAgo);
 
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
 
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
-
 // Function to create an order with a fixed order date
-async function createOrder(orderDate, productCount, orderStatuses, day, routeCount, customerCount) {
+async function createOrder(
+    orderDate,
+    productCount,
+    orderStatuses,
+    day,
+    routeCount,
+    customerCount
+) {
     const customerID = getRandomInt(1, customerCount);
     const routeID = getRandomInt(1, routeCount);
-    const delDate = day - getRandomInt(12, 20)
+    const delDate = day - getRandomInt(12, 20);
     const deliveryDate = calculatePastDate(delDate); // Delivery date between 12 and 20 days after order date
-    const status = orderStatuses[Math.random() > 0.1 ? orderStatuses.length - 2 : orderStatuses.length - 1]; // Either 'Delivered' or 'Cancelled'
+    const status =
+        orderStatuses[
+            Math.random() > 0.1
+                ? orderStatuses.length - 2
+                : orderStatuses.length - 1
+        ]; // Either 'Delivered' or 'Cancelled'
 
     try {
         const [orderResult] = await pool.query(
@@ -42,6 +53,10 @@ async function createOrder(orderDate, productCount, orderStatuses, day, routeCou
             [customerID, orderDate, deliveryDate, routeID]
         );
 
+        //Remove auto added tracking
+        await pool.query(`DELETE FROM Order_Tracking WHERE OrderID = ?`
+            , [orderResult.insertId]
+        );
         const orderID = orderResult.insertId;
 
         // Add random products to the order
@@ -63,10 +78,11 @@ async function createOrder(orderDate, productCount, orderStatuses, day, routeCou
             [orderID, finalTime, status]
         );
 
-
-        console.log(`Order ${orderID} created on ${orderDate} with status ${status}`);
+        console.log(
+            `Order ${orderID} created on ${orderDate} with status ${status}`
+        );
     } catch (error) {
-        console.error('Error creating order:', error);
+        console.error("Error creating order:", error);
     }
 }
 
@@ -84,7 +100,12 @@ async function createTrackingRecord(orderID, orderStatuses, day) {
 }
 
 // Function to create orders sequentially for each day in the past two years
-async function createOrdersForEachDay(productCount, orderStatuses, routeCount, customerCount) {
+async function createOrdersForEachDay(
+    productCount,
+    orderStatuses,
+    routeCount,
+    customerCount
+) {
     const days = 365 * 3; // Past two years
 
     for (let day = days; day >= 20; day--) {
@@ -92,7 +113,14 @@ async function createOrdersForEachDay(productCount, orderStatuses, routeCount, c
         const numOrders = getRandomInt(1, 10); // Random orders per day
 
         for (let i = 0; i < numOrders; i++) {
-            await createOrder(orderDate, productCount, orderStatuses, day, routeCount, customerCount);
+            await createOrder(
+                orderDate,
+                productCount,
+                orderStatuses,
+                day,
+                routeCount,
+                customerCount
+            );
         }
     }
 }

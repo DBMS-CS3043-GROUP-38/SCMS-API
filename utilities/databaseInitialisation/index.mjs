@@ -12,14 +12,13 @@ import pool from '../database/db.mjs';
 
 
 const storeCities = ['Kurunegala', 'Colombo', 'Galle', 'Jaffna', 'Batticaloa'];
-const productCategories = ['Fashion', 'Home Appliances', 'Furniture', 'Electronics'];
+const productCategories = ['Clothes', 'Groceries', 'Electronics', 'Cosmetics', 'Others'];
 const orderStatuses = ['Pending', 'PendingDispatch', 'InTrain', 'InStore', 'InShipment', 'InTruck', 'Attention', 'Delivered', 'Cancelled'];
 
 const databaseInitialisation = async () => {
     await storeCreation(storeCities);
     const customerCount = await userCreation(storeCities);
     const nuOfProducts = await productCreation(productCategories);
-    console.log('Product count:', nuOfProducts);
     await statusCreation(orderStatuses);
     await trainCreation(100, storeCities.length);
     await truckCreation(storeCities.length);
