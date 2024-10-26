@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import dashboardRoutes from './routes/dashboard/dashboard.mjs';
-
+import itemsRouter from './routes/users/customer/displayItems.mjs';
 dotenv.config();
 
 const app = express();
@@ -11,6 +11,12 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/dashboard', dashboardRoutes);
+
+
+//Routes in customer UI
+app.use('/api', itemsRouter);
+
+
 
 app.get('/test', (req, res) => {
     res.send('Server is working');
