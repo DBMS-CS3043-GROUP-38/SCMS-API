@@ -778,4 +778,16 @@ DELIMITER ;
 
 
 
+-- Stored Procedure to get routes by city
+
+DELIMITER //
+CREATE PROCEDURE GetRoutesByCity(IN cityName VARCHAR(255))
+BEGIN
+    SELECT RouteID, Description 
+    FROM route 
+    LEFT JOIN store USING (StoreID) 
+    WHERE City = cityName;
+END //
+DELIMITER ;
+
 
