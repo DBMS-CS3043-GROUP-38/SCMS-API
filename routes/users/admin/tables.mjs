@@ -88,14 +88,14 @@ router.get('/products/:type', async (req, res) => {
 router.get('/weekly-trains', async (req, res) => {
     try {
         const query = `
-            select TrainID      as id,
-                   Day          as dayOfWeek,
-                   Time         as time,
-                   FullCapacity as maxCapacity,
-                   s.City       as destinationCity
+            select TrainID      as TrainID,
+                   Day          as WeekDay,
+                   Time         as Time,
+                   FullCapacity as Capacity,
+                   s.City       as Destination
             from train
                      join store s on s.StoreID = train.StoreID
-            order by dayOfWeek, time
+            order by WeekDay, time
             ;
         `;
         const [rows] = await pool.query(query);
