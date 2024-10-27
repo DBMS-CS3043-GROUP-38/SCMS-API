@@ -683,8 +683,6 @@ BEGIN
     RETURN CONCAT('Schedules added from ', start_date, ' to ', end_date, ': ', schedules_added);
 END //
 
-DELIMITER ;
-
 
 
 
