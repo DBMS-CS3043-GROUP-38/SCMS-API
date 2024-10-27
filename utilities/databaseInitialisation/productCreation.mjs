@@ -23,8 +23,8 @@ async function productCreation(categories) {
             const name = faker.commerce.productName();
             //
             const trainCapacityConsumption = (Math.random() * 10).toFixed(2);
-            //Random price decimal (10,2) between 100 and 10000
-            const price = (Math.random() * 9900 + 100).toFixed(2);
+            //Random price decimal (10,2) between 5 and 500
+            const price = (Math.random() * 500 + 5).toFixed(2);
             await createProduct({name, trainCapacityConsumption, type: category, price});
             createdProducts++;
         }

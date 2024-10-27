@@ -9,16 +9,40 @@ router.get('/test', (req, res) => {
 
 router.post('/schedule-trains', async (req, res) => {
     try {
-        const query = `
-            select AddFutureTrains();
-        `;
+        const query = 'SELECT AddFutureTrains() AS result';
         const [rows] = await pool.query(query);
-        res.json({message: 'Trains scheduled successfully', scheduled: rows[0]['AddFutureTrains()']});
+        
+        const resultString = rows[0].result;
+        
+        // Updated regex pattern to match the new format
+        const regex = /Schedules added from (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2}): (\d+)/;
+        const matches = resultString.match(regex);
+        
+        if (matches) {
+            const [, startDate, endDate, schedulesAdded] = matches;
+            
+            res.json({
+                message: 'Trains scheduled successfully',
+                startDate: startDate,
+                endDate: endDate,
+                scheduled: parseInt(schedulesAdded)
+            });
+        } else {
+            // In case the regex doesn't match
+            res.json({
+                message: 'Trains scheduled successfully',
+                rawResult: resultString,
+                startDate: null,
+                endDate: null,
+                scheduled: 0
+            });
+        }
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to schedule trains'});
+        res.status(500).json({ error: 'Failed to schedule trains' });
     }
-})
+});
+
 
 router.post('/schedule-orders', async (req, res) => {
     let ScheduledOrders = 0;

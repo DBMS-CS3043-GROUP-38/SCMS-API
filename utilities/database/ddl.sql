@@ -620,8 +620,10 @@ GROUP BY ts.TruckID;
 
 -- This function adds future train schedules for the next 7 days
 -- These two functions might be implemented in the back end later.
+DELIMITER //
+
 CREATE FUNCTION AddFutureTrains()
-    RETURNS INT
+    RETURNS VARCHAR(255)
     DETERMINISTIC
 BEGIN
     DECLARE end_date DATE;
@@ -631,58 +633,59 @@ BEGIN
     DECLARE full_capacity DECIMAL(10, 2);
     DECLARE store_id INT;
     DECLARE train_time TIME;
-    DECLARE train_day ENUM ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+    DECLARE train_day VARCHAR(10);
     DECLARE schedules_added INT DEFAULT 0;
     DECLARE date_ptr DATE;
 
+    -- Declare cursor
     DECLARE train_cursor CURSOR FOR
         SELECT TrainID, FullCapacity, StoreID, Time, Day
         FROM Train;
 
+    -- Declare handler for cursor
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
-    -- Set the end date to 7 days from now
-    SET end_date = DATE_ADD(CURDATE(), INTERVAL 7 DAY);
-
-    -- Set the start date to the last scheduled date or today
-    SELECT COALESCE(MAX(DATE(ScheduleDateTime)), CURDATE())
+    -- Get start date
+    SELECT COALESCE(DATE_ADD(MAX(DATE(ScheduleDateTime)), INTERVAL 1 DAY), CURDATE())
     INTO start_date
-    FROM TrainSchedule
-    WHERE ScheduleDateTime >= CURDATE();
+    FROM TrainSchedule;
 
+    -- Set end date
+    SET end_date = DATE_ADD(start_date, INTERVAL 6 DAY);
 
-    -- CLOSE FUNCTION IF ALREADY SCHEDULED FOR 7 DAYS
-    IF start_date >= end_date THEN
-        RETURN 0;
-    END IF;
-
-    -- Loop through each train
+    -- Open cursor and loop through trains
     OPEN train_cursor;
-    read_loop:
-    LOOP
+
+    read_loop: LOOP
         FETCH train_cursor INTO train_id, full_capacity, store_id, train_time, train_day;
+
         IF done THEN
             LEAVE read_loop;
         END IF;
 
-        -- Add schedules for this train
-        SET date_ptr = DATE_ADD(start_date, INTERVAL 1 DAY);
-        WHILE date_ptr <= end_date
-            DO
-                IF DAYNAME(date_ptr) = train_day THEN
-                    INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
-                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
-                    SET schedules_added = schedules_added + 1;
-                END IF;
-                SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
-            END WHILE;
+        -- Set pointer to start date
+        SET date_ptr = start_date;
+
+        -- Loop through dates
+        WHILE date_ptr <= end_date DO
+            IF DAYNAME(date_ptr) = train_day THEN
+                INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
+                VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
+
+                SET schedules_added = schedules_added + 1;
+            END IF;
+            SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
+        END WHILE;
     END LOOP;
 
     CLOSE train_cursor;
 
-    RETURN schedules_added;
-END;
-//
+    RETURN CONCAT('Schedules added from ', start_date, ' to ', end_date, ': ', schedules_added);
+END //
+
+DELIMITER ;
+
+
 
 
 -- Trigger to check work hours for driver and assistant when creating a truck schedule
@@ -717,7 +720,7 @@ END;
 --     IF (assistantCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > assistantWorkingHours THEN
 --         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds assistant\'s available work hours';
 --     END IF;
--- END //
+-- END
 
 
 
@@ -783,7 +786,6 @@ BEGIN
     FROM route
              LEFT JOIN store USING (StoreID)
     WHERE City = cityName;
-END //
-
+END//
 
 DELIMITER ;
