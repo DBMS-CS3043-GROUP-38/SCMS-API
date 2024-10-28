@@ -73,7 +73,7 @@ cron.schedule('* * * * *', async () => {
             const [trucks] = await connection.promise().query(`
                 SELECT TruckID
                 FROM truck
-                WHERE Status = 'available' AND StoreID = ?
+                WHERE Status = 'Available' AND StoreID = ?
                 LIMIT 1
             `, [shipment.StoreID]);
 
@@ -85,7 +85,7 @@ cron.schedule('* * * * *', async () => {
             const TruckID = trucks[0].TruckID;
             await connection.promise().query(`
                 UPDATE truck
-                SET Status = 'Unavailable'
+                SET Status = 'Busy'
                 WHERE TruckID = ?
             `, [TruckID]);
 
@@ -101,14 +101,29 @@ cron.schedule('* * * * *', async () => {
             const routeDuration = route[0].Time_duration;
 
             // Step 3: Assign driver and assistant according to roster rules
-            const [drivers] = await connection.promise().query(`
-                SELECT DriveID
-                FROM driver
-                WHERE Status = 'Available' AND CompletedHours <= 40
-                AND NOT EXISTS (
+
+            await connection.promise().query(`
+                CREATE OR REPLACE VIEW AvailableDrivers AS
+                SELECT d.DriverID, e.EmployeeID, d.CompletedHours
+                FROM driver d
+                JOIN employees e ON d.EmployeeID = e.EmployeeID
+                WHERE d.Status = 'Available' AND d.CompletedHours <= 40
+                AND e.StoreID = ? AND NOT EXISTS (
                     SELECT 1
                     FROM truckschedule ts
-                    WHERE ts.DriveID = driver.DriveID
+                    WHERE ts.DriveID = AvailableDrivers.DriveID
+                    ORDER BY ts.ScheduleDateTime DESC
+                    LIMIT 1
+                )
+            `, [shipment.StoreID]);
+
+            const [drivers] = await connection.promise().query(`
+                SELECT DriveID
+                FROM AvailableDrivers
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM truckschedule ts
+                    WHERE ts.DriveID = AvailableDrivers.DriveID
                     ORDER BY ts.ScheduleDateTime DESC
                     LIMIT 1
                 )
@@ -138,7 +153,7 @@ cron.schedule('* * * * *', async () => {
                 if(driver.CompletedHours + routeDuration <= 40){
                     await connection.promise().query(`
                         UPDATE driver
-                        SET Status = 'Unavailable', CompletedHours = CompletedHours + ?
+                        SET Status = 'Busy'
                         WHERE DriverID = ?
                     `, [routeDuration,driver.DriverID]);
                 }
@@ -152,7 +167,7 @@ cron.schedule('* * * * *', async () => {
                 if(assistant.CompletedHours + routeDuration <= 60){
                     await connection.promise().query(`
                         UPDATE assistant
-                        SET Status = 'Unavailable', CompletedHours = CompletedHours + ?
+                        SET Status = 'Busy'
                         WHERE AssistantID = ?
                     `, [routeDuration,assistant.AssistantID]);
                 }
@@ -166,8 +181,8 @@ cron.schedule('* * * * *', async () => {
 
             // Assign to the truck schedule
             await connection.promise().query(`
-                INSERT INTO truckschedule (TruckID, DriveID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO truckschedule (TruckID, DriveID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours, Status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'Not Completed')
             `, [TruckID, shipmentDriver.DriveID, shipmentAssistant.AssistantID, shipment.ShipmentID, date, shipment.StoreID, routeDuration]);
 
             console.log(`Driver ${shipmentDriver.DriveID} and assistant ${shipmentAssistant.AssistantID} assigned to truck ${TruckID} to deliver the shipment ${shipment.ShipmentID}. `);
