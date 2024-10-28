@@ -8,6 +8,7 @@ import citiesRoute from './routes/users/customer/cities.mjs';
 import routeRoute from './routes/users/customer/getroute.mjs';
 import profileRouter from './routes/users/customer/profile.mjs';
 import cors from 'cors';
+import driverRoute from './routes/users/driver/driverRoutes.mjs';
 dotenv.config();
 
 const app = express();
@@ -24,6 +25,7 @@ app.use(cors(
 
 // Routes
 app.use('/dashboard', dashboardRoutes);
+app.use('/driver', driverRoute);
 
 
 //Routes in customer UI
