@@ -50,7 +50,7 @@ router.post('/bundle-orders', async (req, res) => {
             let orderAdded = false;
 
             for (let shipment of shipments) {
-                if (shipment.FilledCapacity + order.TotalVolume <= shipment.Capacity) {
+                if (parseFloat(shipment.FilledCapacity) + parseFloat(order.TotalVolume) <= parseFloat(shipment.Capacity)) {
                     await connection.query(addOrderToShipment, [shipment.ShipmentID, order.OrderID]);
                     await connection.query(createRecord, [order.OrderID]);
                     orderAdded = true;

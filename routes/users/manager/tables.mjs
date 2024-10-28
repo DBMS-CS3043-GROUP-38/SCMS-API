@@ -542,4 +542,27 @@ router.get('/routes', async (req , res) => {
     }
 });
 
+router.get('/orders-by-shipment/:shipmentID', async (req, res) => {
+    try {
+        const shipmentID = req.params.shipmentID;
+        const query = `
+            select 
+                OrderID as orderID,
+                order_details_with_latest_status.CustomerID as customerID,
+                CustomerName as customerName,
+                RouteID as routeID,
+                Address as address,
+                Contact as contact,
+                TotalVolume as volume,
+                OrderDate as orderDate
+                from order_details_with_latest_status join customer on customer.CustomerID = order_details_with_latest_status.CustomerID where ShipmentID = ${shipmentID};
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch orders by shipment'});
+    }
+});
+
 export default router;
