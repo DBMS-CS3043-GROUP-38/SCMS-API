@@ -430,39 +430,6 @@ from assistant a
          join employee e on a.EmployeeID = e.EmployeeID;
 //
 
-
-create view truck_schedule_with_details as
-select ts.TruckScheduleID,
-       ts.StoreID,
-       ts.ShipmentID,
-       ts.ScheduleDateTime,
-       ts.RouteID,
-       ts.AssistantID,
-       ts.DriverID,
-       ts.TruckID,
-       ts.Hours,
-       ts.Status,
-       s.City as StoreCity,
-       a.Name as AssistantName,
-       d.Name as DriverName,
-       t.LicencePlate,
-       Status.TotalOrders,
-       Status.Delivered
-from truckschedule ts
-         join truck t on ts.TruckID = t.TruckID
-         join route r on ts.RouteID = r.RouteID
-         join store s on t.StoreID = s.StoreID
-         join driver_details_with_employee d on ts.DriverID = d.DriverID
-         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID
-         join (select Shipment_contains.ShipmentID,
-                      COUNT(Shipment_contains.OrderID)          as TotalOrders,
-                      SUM(IF(LatestStatus = 'Delivered', 1, 0)) as Delivered
-               from shipment_contains
-                        join order_details_with_latest_status
-                             on shipment_contains.OrderID = Order_Details_With_Latest_Status.OrderID
-               group by ShipmentID) as status on ts.ShipmentID = status.ShipmentID
-;
-
 # To get the order details with the latest status and some more details
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
@@ -515,6 +482,41 @@ FROM `Order` o
 ;
 //
 
+# Truck schedule with details
+create view truck_schedule_with_details as
+select ts.TruckScheduleID,
+       ts.StoreID,
+       ts.ShipmentID,
+       ts.ScheduleDateTime,
+       ts.RouteID,
+       ts.AssistantID,
+       ts.DriverID,
+       ts.TruckID,
+       ts.Hours,
+       ts.Status,
+       s.City as StoreCity,
+       a.Name as AssistantName,
+       d.Name as DriverName,
+       t.LicencePlate,
+       Status.TotalOrders,
+       Status.Delivered
+from truckschedule ts
+         join truck t on ts.TruckID = t.TruckID
+         join route r on ts.RouteID = r.RouteID
+         join store s on t.StoreID = s.StoreID
+         join driver_details_with_employee d on ts.DriverID = d.DriverID
+         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID
+         join (select Shipment_contains.ShipmentID,
+                      COUNT(Shipment_contains.OrderID)          as TotalOrders,
+                      SUM(IF(LatestStatus = 'Delivered', 1, 0)) as Delivered
+               from shipment_contains
+                        join order_details_with_latest_status
+                             on shipment_contains.OrderID = Order_Details_With_Latest_Status.OrderID
+               group by ShipmentID) as status on ts.ShipmentID = status.ShipmentID
+;
+
+
+# To get the order details with the latest status and some more details
 CREATE VIEW Quarterly_Product_Report AS
 SELECT YEAR(o.OrderDate)       AS Year,
        QUARTER(o.OrderDate)    AS Quarter,
@@ -793,9 +795,9 @@ BEGIN
     WHERE City = cityName;
 END//
 
-DELIMITER ;
 
--------------procedure  create for profile page--------------
+
+# -------------procedure  create for profile page--------------
 DELIMITER //
 
 CREATE PROCEDURE GetCustomerReport(IN customerId INT)
@@ -803,7 +805,9 @@ BEGIN
     SELECT * FROM customer_report c WHERE c.CustomerID = customerId;
 END //
 
+
+
+
+
+
 DELIMITER ;
-
-
-
