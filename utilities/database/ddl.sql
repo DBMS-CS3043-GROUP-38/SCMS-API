@@ -788,15 +788,29 @@ END//
 
 DELIMITER ;
 
--------------procedure  create for profile page--------------
+-- procedure  create for profile page--------------
 DELIMITER //
 
 CREATE PROCEDURE GetCustomerReport(IN customerId INT)
 BEGIN
-    SELECT * FROM customer_report c WHERE c.CustomerID = customerId;
+    SELECT * FROM customer_profile c WHERE c.CustomerID = customerId;
 END //
 
 DELIMITER ;
 
+
+-- create a view -------------------------
+
+CREATE VIEW customer_profile AS
+SELECT 
+    CustomerID,
+    Name,
+    Username,
+    Address,
+    Type,
+    City,
+    Contact
+FROM 
+    Customer;
 
 
