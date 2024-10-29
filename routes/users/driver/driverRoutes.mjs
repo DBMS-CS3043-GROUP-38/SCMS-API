@@ -91,7 +91,7 @@ router.get('/:driverID/hasInProgress', async (req, res) => {
 //       storeId: schedule.StoreID
 //     });
 // });
-
+ 
 // Update truck schedule status
 router.post('/update-status', async (req, res) => {
   const { TruckScheduleID, Status } = req.body;
@@ -103,7 +103,7 @@ router.post('/update-status', async (req, res) => {
   await connection.commit();
   res.status(200).json({ message: 'Status updated successfully' });
 });
-
+  
 // Fetch employee details
 router.get('/get-employee/:employeeId', (req, res) => {
   const employeeId = req.params.employeeId;
