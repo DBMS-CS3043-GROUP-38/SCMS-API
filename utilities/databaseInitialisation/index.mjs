@@ -12,7 +12,6 @@ import pool from '../database/db.mjs';
 
 
 const storeCities = ['Kurunegala', 'Colombo', 'Galle', 'Jaffna', 'Batticaloa'];
-const productCategories = ['Clothes', 'Groceries', 'Electronics', 'Cosmetics', 'Others'];
 const orderStatuses = ['Pending', 'PendingDispatch', 'InTrain', 'InStore', 'InShipment', 'InTruck', 'Attention', 'Delivered', 'Cancelled'];
 const products = [
     {
