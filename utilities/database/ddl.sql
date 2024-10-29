@@ -445,14 +445,23 @@ select ts.TruckScheduleID,
        s.City as StoreCity,
        a.Name as AssistantName,
        d.Name as DriverName,
-       t.LicencePlate
+       t.LicencePlate,
+       Status.TotalOrders,
+       Status.Delivered
 from truckschedule ts
          join truck t on ts.TruckID = t.TruckID
          join route r on ts.RouteID = r.RouteID
          join store s on t.StoreID = s.StoreID
          join driver_details_with_employee d on ts.DriverID = d.DriverID
-         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID;
-
+         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID
+         join (select Shipment_contains.ShipmentID,
+                      COUNT(Shipment_contains.OrderID)          as TotalOrders,
+                      SUM(IF(LatestStatus = 'Delivered', 1, 0)) as Delivered
+               from shipment_contains
+                        join order_details_with_latest_status
+                             on shipment_contains.OrderID = Order_Details_With_Latest_Status.OrderID
+               group by ShipmentID) as status on ts.ShipmentID = status.ShipmentID
+;
 
 # To get the order details with the latest status and some more details
 CREATE VIEW Order_Details_With_Latest_Status AS
@@ -656,7 +665,8 @@ BEGIN
     -- Open cursor and loop through trains
     OPEN train_cursor;
 
-    read_loop: LOOP
+    read_loop:
+    LOOP
         FETCH train_cursor INTO train_id, full_capacity, store_id, train_time, train_day;
 
         IF done THEN
@@ -667,23 +677,22 @@ BEGIN
         SET date_ptr = start_date;
 
         -- Loop through dates
-        WHILE date_ptr <= end_date DO
-            IF DAYNAME(date_ptr) = train_day THEN
-                INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
-                VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
+        WHILE date_ptr <= end_date
+            DO
+                IF DAYNAME(date_ptr) = train_day THEN
+                    INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
+                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
 
-                SET schedules_added = schedules_added + 1;
-            END IF;
-            SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
-        END WHILE;
+                    SET schedules_added = schedules_added + 1;
+                END IF;
+                SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
+            END WHILE;
     END LOOP;
 
     CLOSE train_cursor;
 
     RETURN CONCAT('Schedules added from ', start_date, ' to ', end_date, ': ', schedules_added);
 END //
-
-
 
 
 -- Trigger to check work hours for driver and assistant when creating a truck schedule
@@ -721,21 +730,19 @@ END //
 -- END
 
 
-
-
 # ----------------------------------Procedures-------------------------------------
 
 
 -- Stored Procedures new ones here
 
-CREATE PROCEDURE CreateOrderWithItems (
+CREATE PROCEDURE CreateOrderWithItems(
     IN p_CustomerID INT,
     IN p_Value DECIMAL(10, 2),
     IN p_OrderDate DATE,
     IN p_DeliveryDate DATE,
     IN p_RouteID INT,
     IN p_TotalVolume DECIMAL(10, 2),
-    IN p_Products JSON  -- JSON array to store multiple products (ProductID, Amount)
+    IN p_Products JSON -- JSON array to store multiple products (ProductID, Amount)
 )
 BEGIN
     DECLARE productID INT;
@@ -757,7 +764,8 @@ BEGIN
     SET productCount = JSON_LENGTH(p_Products);
 
     -- Loop through the products and insert them into the Contains table
-    WHILE productIndex < productCount DO
+    WHILE productIndex < productCount
+        DO
             -- Extract ProductID and Amount from JSON array
             SET productID = JSON_UNQUOTE(JSON_EXTRACT(p_Products, CONCAT('$[', productIndex, '].ProductID')));
             SET amount = JSON_UNQUOTE(JSON_EXTRACT(p_Products, CONCAT('$[', productIndex, '].Amount')));
@@ -773,7 +781,6 @@ BEGIN
     -- Commit the transaction
     COMMIT;
 END//
-
 
 
 -- Stored Procedure to get routes by city

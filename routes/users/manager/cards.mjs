@@ -300,4 +300,18 @@ router.get('/get-available-trucks/', async (req, res) => {
     }
 });
 
+router.get('/truck-schedule-statuses/', async (req, res) => {
+    try {
+        const storeID = req.user.StoreID;
+        const query = `
+       select Status, COUNT(TruckScheduleID) as count from truckschedule where StoreID = ${storeID} group by Status;
+       `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch truck schedule statuses'});
+    }
+});
+
 export default router;

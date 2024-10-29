@@ -17,7 +17,8 @@ router.get('/trains-today', async (req, res) => {
                    FullCapacity     as fullCapacity,
                    ScheduleDateTime as time
             from train_schedule_with_destinations
-            where DATE(ScheduleDateTime) = CURDATE() and StoreID = ${StoreID}
+            where DATE(ScheduleDateTime) = CURDATE()
+              and StoreID = ${StoreID}
             order by ScheduleDateTime;
         `
         const [rows] = await pool.query(query);
@@ -117,27 +118,27 @@ router.get('/active-trains', async (req, res) => {
 })
 
 router.get('/active-shipments', async (req, res) => {
-  try {
-      const StoreID = req.user.StoreID;
-      const query = `
-          select ShipmentID     as id,
-                 route.RouteID  as routeID,
-                 FilledCapacity as capacityFilled,
-                 Capacity       as fullCapacity,
-                 CreatedDate    as createdData,
-                 Status         as status
-          from shipment
-                   join route on shipment.RouteID = route.RouteID
-          where StoreID = ${StoreID}
-            and Status != 'Completed'
-          order by CreatedDate;
-      `
+    try {
+        const StoreID = req.user.StoreID;
+        const query = `
+            select ShipmentID     as id,
+                   route.RouteID  as routeID,
+                   FilledCapacity as capacityFilled,
+                   Capacity       as fullCapacity,
+                   CreatedDate    as createdData,
+                   Status         as status
+            from shipment
+                     join route on shipment.RouteID = route.RouteID
+            where StoreID = ${StoreID}
+              and Status != 'Completed'
+            order by CreatedDate;
+        `
         const [rows] = await pool.query(query);
         res.json(rows);
-  }  catch (e) {
-      console.log(e);
-      res.status(500).json({error: 'Failed to fetch active shipments'});
-  }
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch active shipments'});
+    }
 })
 
 router.get('/instore-orders-list', async (req, res) => {
@@ -151,7 +152,8 @@ router.get('/instore-orders-list', async (req, res) => {
                    StoreCity                          as StoreCity,
                    RouteID                            as RouteID
             from order_details_with_latest_status
-            where LatestStatus = 'InStore' and StoreID = ${StoreID};
+            where LatestStatus = 'InStore'
+              and StoreID = ${StoreID};
         `;
         const [rows] = await pool.query(query);
 
@@ -214,7 +216,7 @@ router.get('/top-customers-quarter/:year/:quarter', async (req, res) => {
             from (select *
                   from order_details_with_latest_status
                   where StoreID = ${storeID}
-                  and YEAR(OrderDate) = ${year}
+                    and YEAR(OrderDate) = ${year}
                     and QUARTER(OrderDate) = ${quarter}
                     and LatestStatus not in ('Cancelled', 'Attention')) o
                      join customer c on o.CustomerID = c.CustomerID
@@ -302,7 +304,8 @@ router.get('/orders-in-train', async (req, res) => {
                               DATE_FORMAT(ts.ScheduleDateTime, '%e-%b-%y %T') as TrainTime
                        from (select *
                              from order_details_with_latest_status
-                             where LatestStatus = 'InTrain' and StoreID = ${StoreID}) as trainAssigned
+                             where LatestStatus = 'InTrain'
+                               and StoreID = ${StoreID}) as trainAssigned
                                 join train_contains tc on trainAssigned.OrderID = tc.OrderID
                                 join train_schedule_with_destinations ts on tc.TrainScheduleID = ts.TrainScheduleID;
         `;
@@ -323,7 +326,7 @@ router.get('/orders-in-store', async (req, res) => {
             select OrderID, StoreID, StoreCity, RouteID
             from order_details_with_latest_status
             where StoreID = ${StoreID}
-                and LatestStatus = 'InStore';
+              and LatestStatus = 'InStore';
         `
 
         const [rows] = await pool.query(query);
@@ -342,7 +345,7 @@ router.get('/orders-in-shipment', async (req, res) => {
             select OrderID, StoreID, ShipmentID, ShipmentStatus
             from order_details_with_latest_status
             where StoreID = ${StoreID}
-               and LatestStatus = 'InShipment';
+              and LatestStatus = 'InShipment';
         `
 
 
@@ -428,7 +431,7 @@ router.get('/admin-data', async (req, res) => {
     try {
         const query = `
             select EmployeeID, Name, Contact, Address
-            from employee 
+            from employee
             where Type = 'Admin';
         `
         const [rows] = await pool.query(query);
@@ -456,7 +459,7 @@ router.get('/top-customers', async (req, res) => {
     }
 });
 
-router.get('/drivers', async (req , res) => {
+router.get('/drivers', async (req, res) => {
     try {
         const StoreID = req.user.StoreID;
         const query = `
@@ -466,7 +469,8 @@ router.get('/drivers', async (req , res) => {
                    Status         AS 'Availability',
                    CompletedHours AS 'CompletedHours',
                    WorkingHours   AS 'WorkHours'
-            from driver_details_with_employee where StoreID = ${StoreID};
+            from driver_details_with_employee
+            where StoreID = ${StoreID};
         `;
 
         const [rows] = await pool.query(query);
@@ -478,7 +482,7 @@ router.get('/drivers', async (req , res) => {
 });
 
 
-router.get('/assistants', async (req , res) => {
+router.get('/assistants', async (req, res) => {
     try {
         const StoreID = req.user.StoreID;
         const query = `
@@ -489,7 +493,8 @@ router.get('/assistants', async (req , res) => {
                    Status         AS 'Availability',
                    CompletedHours AS 'CompletedHours',
                    WorkingHours   AS 'WorkHours'
-            from assistant_details_with_employee where StoreID = ${StoreID};
+            from assistant_details_with_employee
+            where StoreID = ${StoreID};
         `;
 
         const [rows] = await pool.query(query);
@@ -500,7 +505,7 @@ router.get('/assistants', async (req , res) => {
     }
 });
 
-router.get('/trucks', async (req , res) => {
+router.get('/trucks', async (req, res) => {
     try {
         const StoreID = req.user.StoreID;
         const query = `
@@ -522,7 +527,7 @@ router.get('/trucks', async (req , res) => {
     }
 });
 
-router.get('/routes', async (req , res) => {
+router.get('/routes', async (req, res) => {
     try {
         const StoreID = req.user.StoreID;
         const query = `
@@ -531,7 +536,8 @@ router.get('/routes', async (req , res) => {
                    Distance      AS 'Distance(KM)',
                    Time_duration AS 'Time Duration',
                    Description   AS 'Description'
-            from route where StoreID = ${StoreID};
+            from route
+            where StoreID = ${StoreID};
         `;
 
         const [rows] = await pool.query(query);
@@ -541,5 +547,72 @@ router.get('/routes', async (req , res) => {
         res.status(500).json({error: 'Failed to fetch routes'});
     }
 });
+
+router.get('/orders-by-shipment/:shipmentID', async (req, res) => {
+    try {
+        const shipmentID = req.params.shipmentID;
+        const query = `
+            select OrderID                                     as orderID,
+                   order_details_with_latest_status.CustomerID as customerID,
+                   CustomerName                                as customerName,
+                   RouteID                                     as routeID,
+                   Address                                     as address,
+                   Contact                                     as contact,
+                   TotalVolume                                 as volume,
+                   OrderDate                                   as orderDate
+            from order_details_with_latest_status
+                     join customer on customer.CustomerID = order_details_with_latest_status.CustomerID
+            where ShipmentID = ${shipmentID};
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch orders by shipment'});
+    }
+});
+
+router.get('/truck-schedule/:shipmentID', async (req, res) => {
+    try {
+        const shipmentID = req.params.shipmentID;
+        const query = `
+            select *
+            from truck_schedule_with_details
+            where ShipmentID = ${shipmentID};
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch truck schedule'});
+    }
+});
+
+router.get('/truck-schedules', async (req, res) => {
+    try {
+        const storeID = req.user.StoreID;
+        const query = `
+            select 
+                TruckScheduleID as 'Schedule ID',
+                ShipmentID as 'Shipment ID',
+                TruckID as 'Truck ID',
+                ShipmentID as 'Shipment ID',
+                DriverID as 'Driver ID',
+                DriverName as 'Driver Name',
+                AssistantID as 'Assistant ID',
+                AssistantName as 'Assistant Name',
+                Delivered as 'Delivered',
+                TotalOrders as 'Total Orders',
+                ScheduleDateTime as 'Schedule Time',
+            Status as 'Status'
+            from truck_schedule_with_details where  StoreID = ${storeID};
+        `
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({error: 'Failed to fetch truck schedules'});
+    }
+})
 
 export default router;
