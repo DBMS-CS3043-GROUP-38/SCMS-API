@@ -7,63 +7,77 @@ const db = pool;
 
 // API endpoint for login
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const query = 'SELECT EmployeeID, Name, PasswordHash, Type, DriverID, AssistantID FROM login_info_view WHERE Username = ?';
-  console.log('1');
-  const [result] = await pool.query(query, [username]);
-  if (result.length == 0)
-    return res.status(200).json({ success: false, message: 'User not found' });
-  
-  console.log('2');
-  const employee = result[0];
-  const isPasswordMatch = bcrypt.compareSync(password, employee.PasswordHash);
-  if (isPasswordMatch) {
-    console.log('passmatch');
-    const responseData = {
-      success: true,
-      type: employee.Type,
-      id: employee.Type === 'Driver' ? employee.DriverID : employee.AssistantID,
-      emp_id: employee.EmployeeID,
-      name: employee.Name
-    };
-    return res.status(200).json(responseData);
-  } else {
-    console.log("nopassmatch");
-    return res.status(200).json({ success: false, message: 'Incorrect password' });
+  try{
+    const { username, password } = req.body;
+    const query = 'SELECT EmployeeID, Name, PasswordHash, Type, DriverID, AssistantID FROM login_info_view WHERE Username = ?';
+    console.log('1');
+    const [result] = await pool.query(query, [username]);
+    if (result.length == 0)
+      return res.status(200).json({ success: false, message: 'User not found' });
+    
+    console.log('2');
+    const employee = result[0];
+    const isPasswordMatch = bcrypt.compareSync(password, employee.PasswordHash);
+    if (isPasswordMatch) {
+      console.log('passmatch');
+      const responseData = { 
+        success: true, 
+        type: employee.Type,
+        id: employee.Type === 'Driver' ? employee.DriverID : employee.AssistantID,
+        emp_id: employee.EmployeeID,
+        name: employee.Name
+      };
+      return res.status(200).json(responseData);
+    } else {
+      console.log("nopassmatch");
+      return res.status(200).json({ success: false, message: 'Incorrect password' });
+    }
+  }catch(e){
+    console.error(e);
+    res.status(500).json({error: "An Error Occurred when trying to Log in!"});
   }
-  
 });
 
 // Fetch driver schedules
 router.get('/driver/:driverID/schedules', async (req, res) => {
-  const driverID = req.params.driverID;
-  const query = `
-    SELECT t.TruckScheduleID, t.RouteID, t.TruckID, t.StoreID, t.ShipmentID, t.Status, t.ScheduleDateTime, e.Name 
-    FROM TruckSchedule AS t 
-    INNER JOIN login_info_view AS e ON t.AssistantID = e.AssistantID 
-    WHERE t.DriverID = ? AND (t.Status = 'Not Completed' OR t.Status = 'In Progress');
-  `;
-  const [results] = await db.query(query, [driverID]);
-    if (results.length === 0)
-      return res.status(404).json({ success: false, message: 'No schedules found' });
-    res.json(results);
-});
+  try{
+    const driverID = req.params.driverID;
+    const query = `
+      SELECT t.TruckScheduleID, t.RouteID, t.TruckID, t.StoreID, t.ShipmentID, t.Status, t.ScheduleDateTime, e.Name 
+      FROM TruckSchedule AS t 
+      INNER JOIN login_info_view AS e ON t.AssistantID = e.AssistantID 
+      WHERE t.DriverID = ? AND (t.Status = 'Not Completed' OR t.Status = 'In Progress')
+      ORDER BY t.ScheduleDateTime ASC;
+    `; 
+    const [results] = await db.query(query, [driverID]);
+      if (results.length === 0)
+        return res.status(404).json({ success: false, message: 'No schedules found' });
+      res.json(results); 
+  }catch(e){
+    console.error(e);
+    res.status(500).json({error: "Failed to get Driver Schedules"});
+  }
+});    
 
 router.get('/:driverID/hasInProgress', async (req, res) => {
-  console.log("hmm");
-  const driverID = req.params.driverID;
+  try{
+    const driverID = req.params.driverID;
 
-  const query = `
-    SELECT EXISTS(
-      SELECT 1 
-      FROM TruckSchedule 
-      WHERE DriverID = ${driverID} AND Status = 'In Progress'
-    ) AS hasInProgress;
-  `;
+    const query = `
+      SELECT EXISTS(
+        SELECT 1 
+        FROM TruckSchedule 
+        WHERE DriverID = ${driverID} AND Status = 'In Progress'
+      ) AS hasInProgress;
+    `;
 
-  const [results] = await db.query(query, [driverID]);
-  const hasInProgress = results[0].hasInProgress === 1;
-  res.status(200).json({ hasInProgress });
+    const [results] = await db.query(query, [driverID]);
+    const hasInProgress = results[0].hasInProgress === 1;
+    res.status(200).json({ hasInProgress });
+  }catch(e){
+    console.error(e);
+    res.status(500).json({error: "Failed to get If In progress"});
+  }
 });
 
 
@@ -94,30 +108,39 @@ router.get('/:driverID/hasInProgress', async (req, res) => {
  
 // Update truck schedule status
 router.post('/update-status', async (req, res) => {
-  const { TruckScheduleID, Status } = req.body;
-  const connection = await db.getConnection();
-  const query = `UPDATE TruckSchedule SET Status = "${Status}" WHERE TruckScheduleID = ${TruckScheduleID}`;
+  try{
+    const { TruckScheduleID, Status } = req.body;
+    const connection = await db.getConnection();
+    const query = `UPDATE TruckSchedule SET Status = "${Status}" WHERE TruckScheduleID = ${TruckScheduleID}`;
 
-  await connection.beginTransaction();
-  await connection.query(query);
-  await connection.commit();
-  res.status(200).json({ message: 'Status updated successfully' });
-});
+    await connection.beginTransaction();
+    await connection.query(query);
+    await connection.commit();
+    res.status(200).json({ message: 'Status updated successfully' });
+  }catch(e){
+    console.error(e);
+    res.status(500).json({error: "Failed to Update Status"});
+  }
+});  
   
 // Fetch employee details
-router.get('/get-employee/:employeeId', (req, res) => {
-  const employeeId = req.params.employeeId;
-  const query = `
-    SELECT e.Name, e.Address, e.Contact, e.Type, e.Username, d.WorkingHours, d.CompletedHours 
-    FROM Employee AS e 
-    INNER JOIN Driver AS d ON e.EmployeeID = d.EmployeeID 
-    WHERE e.EmployeeID = ?
-  `;
-  db.query(query, [employeeId], (err, result) => {
-    if (err) return res.status(500).send('Server error');
-    if (result.length === 0) return res.status(404).send('Employee not found');
-    res.status(200).json(result[0]);
-  });
+router.get('/get-employee/:employeeId', async (req, res) => {
+  try{
+    const employeeId = req.params.employeeId;
+    const query = `
+      SELECT e.Name, e.Address, e.Contact, e.Type, e.Username, d.WorkingHours, d.CompletedHours 
+      FROM Employee AS e 
+      INNER JOIN Driver AS d ON e.EmployeeID = d.EmployeeID 
+      WHERE e.EmployeeID = ${employeeId};
+    `;
+    const [results] = await db.query(query, [employeeId]);
+    if (results.length === 0)
+      return res.status(404).send('Employee not found');
+    res.status(200).json(results[0]);
+  }catch (e){
+    console.error(e);
+    res.status(500).json({error: "Failed to get Employee Details"});
+  }
 });
 
 export default router;
