@@ -23,20 +23,21 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-// GET route to fetch user profile
+// GET route to fetch user profile using stored procedure
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM customer WHERE CustomerID = ?', [req.userId]);
+    // Call the stored procedure using db.query with the CALL syntax
+    const [rows] = await db.query('CALL GetCustomerReport(?)', [req.userId]);
     
-    if (rows.length === 0) {
+    if (rows[0].length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.status(200).json(rows[0]); // Return the user profile data
+    res.status(200).json(rows[0][0]); // Return the user profile data from the stored procedure
   } catch (error) {
     console.error('Error fetching user data:', error);
     res.status(500).json({ message: 'Error fetching user data', error: error.message });
   }
 });
 
-export default router;  
+export default router;

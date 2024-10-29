@@ -787,3 +787,13 @@ BEGIN
 END//
 
 DELIMITER ;
+
+-------------procedure  create for profile page--------------
+DELIMITER //
+
+CREATE PROCEDURE GetCustomerReport(IN customerId INT)
+BEGIN
+    SELECT * FROM customer_report c WHERE c.CustomerID = customerId;
+END //
+
+DELIMITER ;
