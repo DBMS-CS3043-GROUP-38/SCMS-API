@@ -7,17 +7,6 @@ router.get('/test', (req, res) => {
     res.send('Admin dashboard route working');
 });
 
-router.post('/schedule-trains', async (req, res) => {
-    try {
-        const query = `select AddFutureTrains();`;
-        const [rows] = await pool.query(query);
-        res.json({message: 'Trains scheduled successfully', scheduled: rows[0]['AddFutureTrains()']});
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({error: 'Failed to schedule trains'});
-    }
-});
-
 router.post('/bundle-orders', async (req, res) => {
     const connection = await pool.getConnection();
     let AddedOrders = 0;
@@ -50,7 +39,7 @@ router.post('/bundle-orders', async (req, res) => {
             let orderAdded = false;
 
             for (let shipment of shipments) {
-                if (shipment.FilledCapacity + order.TotalVolume <= shipment.Capacity) {
+                if (parseFloat(shipment.FilledCapacity) + parseFloat(order.TotalVolume) <= parseFloat(shipment.Capacity)) {
                     await connection.query(addOrderToShipment, [shipment.ShipmentID, order.OrderID]);
                     await connection.query(createRecord, [order.OrderID]);
                     orderAdded = true;
@@ -176,18 +165,5 @@ router.patch('/report-order/:orderID', async (req, res) => {
     }
 });
 
-router.patch('/cancel-order/:orderID', async (req, res) => {
-    try {
-        const { orderID } = req.params;
-        const query = `
-            insert into order_tracking (OrderID, TimeStamp, Status) VALUES (?, now(), 'Cancelled');
-        `;
-        await pool.query(query, [orderID]);
-        res.json({message: `Order ${orderID} cancelled successfully`});
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({error: 'Failed to cancel order'});
-    }
-});
 
 export default router;

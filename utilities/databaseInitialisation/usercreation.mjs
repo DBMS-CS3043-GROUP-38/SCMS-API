@@ -53,7 +53,7 @@ async function createCustomer(data) {
 }
 
 async function userCreation(cities) {
-    //Generate 5 Admins
+    //Generate 2 Admins
     for (let i = 0; i < 2; i++) {
         const fullName = faker.person.fullName();
         const randomNumber = Math.floor(Math.random() * 1000);

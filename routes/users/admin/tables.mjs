@@ -9,452 +9,246 @@ router.get('/test', (req, res) => {
 
 router.get('/trains-today', async (req, res) => {
     try {
-        const query = `
-            select TrainScheduleID  as id,
-                   StoreCity        as destination,
-                   FilledPercentage as capacityFilled,
-                   FullCapacity     as fullCapacity,
-                   ScheduleDateTime as time
-            from train_schedule_with_destinations
-            where DATE(ScheduleDateTime) = CURDATE()
-            order by ScheduleDateTime;
-        `
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetTrainsToday()');
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (error) {
         console.log(error);
-        res.status(500).json({error: 'Failed to fetch trains today'});
+        res.status(500).json({ error: 'Failed to fetch trains today' });
     }
-})
+});
+
 
 router.get('/best-products-quarter', async (req, res) => {
     try {
-        const query = `
-            select ProductID    as id,
-                   ProductName  as name,
-                   ProductType  as category,
-                   TotalRevenue as revenue
-            from quarterly_product_report
-            where Year = YEAR(CURDATE())
-              and Quarter = QUARTER(CURDATE())
-            order by revenue desc;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetBestProductsQuarter()');
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (error) {
         console.log(error);
-        res.status(500).json({error: 'Failed to fetch best product of the quarter'});
+        res.status(500).json({ error: 'Failed to fetch best products of the quarter' });
     }
 });
+
 
 router.get('/products/:type', async (req, res) => {
     try {
         const type = req.params.type;
-        var query;
-        if (type === 'All') {
-            query = `
-                select product.ProductID                    as 'id',
-
-                       product.Name                         as 'Product Name',
-                       product.Price                        as 'Price',
-                       COUNT(contains.OrderID)              as 'Total Orders',
-                       SUM(contains.Amount * product.Price) as 'Total Revenue'
-                from product
-                         join contains on product.ProductID = contains.ProductID
-                group by product.ProductID;
-            `;
-        } else {
-            query = `
-                select product.ProductID                    as 'id',
-                       product.Name                         as 'Product Name',
-                       product.Price                        as 'Price',
-                       COUNT(contains.OrderID)              as 'Total Orders',
-                       SUM(contains.Amount * product.Price) as 'Total Revenue'
-                from product
-                         join contains on product.ProductID = contains.ProductID
-                where product.Type = '${type}'
-                group by product.ProductID;
-            `;
-        }
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetProductsByType(?)', [type]);
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (e) {
         console.log(e);
-        res.status(500).json({error: 'Failed to fetch products'});
+        res.status(500).json({ error: 'Failed to fetch products' });
     }
-})
+});
 
 
 router.get('/weekly-trains', async (req, res) => {
     try {
-        const query = `
-            select TrainID      as TrainID,
-                   Day          as WeekDay,
-                   Time         as Time,
-                   FullCapacity as Capacity,
-                   s.City       as Destination
-            from train
-                     join store s on s.StoreID = train.StoreID
-            order by WeekDay, time
-            ;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetWeeklyTrains()');
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (error) {
         console.log(error);
-        res.status(500).json({error: 'Failed to fetch weekly trains'});
+        res.status(500).json({ error: 'Failed to fetch weekly trains' });
     }
 });
+
 
 router.get('/scheduled-trains', async (req, res) => {
     try {
-        const query = `
-            select TrainID          as id,
-                   TrainScheduleID  as scheduleID,
-                   StoreCity        as destination,
-                   FilledPercentage as capacityFilled,
-                   FullCapacity     as fullCapacity,
-                   ScheduleDateTime as time,
-                   TotalOrders      as orders
-            from train_schedule_with_destinations
-            where Status = 'Not Completed'
-            order by ScheduleDateTime
-            ;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetScheduledTrains()');
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (error) {
         console.log(error);
-        res.status(500).json({error: 'Failed to fetch scheduled trains'});
+        res.status(500).json({ error: 'Failed to fetch scheduled trains' });
     }
 });
+
 
 router.get('/active-trains', async (req, res) => {
     try {
-        const query = `
-            select TrainID          as id,
-                   TrainScheduleID  as scheduleID,
-                   StoreCity        as destination,
-                   FilledPercentage as capacityFilled,
-                   FullCapacity     as fullCapacity,
-                   ScheduleDateTime as time,
-                   Status           as status
-            from train_schedule_with_destinations
-            where Status != 'Completed'
-            order by ScheduleDateTime;
-        `
-        const [rows] = await pool.query(query);
-        res.json(rows);
-    } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch active trains'});
+        const [rows] = await pool.query('CALL GetActiveTrains()');
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: 'Failed to fetch active trains' });
     }
-})
+});
+
 
 router.get('/pending-orders-list', async (req, res) => {
     try {
-        const query = `
-            select OrderID                            as OrderID,
-                   DATE_FORMAT(OrderDate, '%Y-%m-%d') as OrderDate,
-                   Value                              as Value,
-                   TotalVolume                        as TotalVolume,
-                   StoreCity                          as StoreCity,
-                   RouteID                            as RouteID
-            from order_details_with_latest_status
-            where LatestStatus = 'Pending'
-        `;
-        const [rows] = await pool.query(query);
-
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetPendingOrders()');
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (e) {
-        res.send('Failed to fetch pending orders');
+        console.error(e); // Log the error for better debugging
+        res.status(500).send('Failed to fetch pending orders');
     }
 });
+
 
 router.get('/orders-by-train/:trainSchID', async (req, res) => {
     try {
         const trainID = req.params.trainSchID;
-        const query = `
-            select o.OrderID as orderID, o.CustomerID as customerID, o.TotalVolume as Capacity, o.Value as Price
-            from (select OrderID from train_contains where TrainScheduleID = ${trainID}) t
-                     join \`order\` o on o.OrderID = t.OrderID;
-        `
-
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetOrdersByTrain(?)', [trainID]);
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (e) {
-        console.log(e);
+        console.error(e); // Log the error for better debugging
         res.status(500).json({error: 'Failed to fetch orders by train'});
     }
-
 });
 
 router.get('/top-products-quarter/:year/:quarter', async (req, res) => {
     try {
-        const {year, quarter} = req.params;
-        const query = `
-            select ProductID    as ProductID,
-                   ProductName  as Name,
-                   ProductType  as Category,
-                   TotalRevenue as Revenue
-            from quarterly_product_report
-            where Year = ${year}
-              and Quarter = ${quarter}
-            order by revenue desc;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const { year, quarter } = req.params;
+        const [rows] = await pool.query('CALL GetTopProductsQuarter(?, ?)', [year, quarter]);
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (e) {
-        console.error(e);
-        res.status(500).json({error: 'Failed to fetch top products per quarter'});
+        console.error(e); // Log the error for better debugging
+        res.status(500).json({ error: 'Failed to fetch top products per quarter' });
     }
-})
+});
+
 
 router.get('/top-customers-quarter/:year/:quarter', async (req, res) => {
     try {
-        const {year, quarter} = req.params;
-        const query = `
-            select c.CustomerID as CustomerID,
-                   c.Name       as Name,
-                   c.City       as City,
-                   SUM(o.Value) as Revenue
-            from (select *
-                  from order_details_with_latest_status
-                  where YEAR(OrderDate) = ${year}
-                    and QUARTER(OrderDate) = ${quarter}
-                    and LatestStatus not in ('Cancelled', 'Attention')) o
-                     join customer c on o.CustomerID = c.CustomerID
-            group by o.CustomerID
-            order by Revenue desc
-            limit 100;
-        `;
-        const [rows] = await pool.query(query);
-        console.log(`Fetched top customers for ${year} Q${quarter}: ${rows.length} rows`);
-        res.json(rows);
+        const { year, quarter } = req.params;
+        const [rows] = await pool.query('CALL GetTopCustomersQuarter(?, ?)', [year, quarter]);
+        console.log(`Fetched top customers for ${year} Q${quarter}: ${rows[0].length} rows`);
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to fetch top customers per quarter'});
+        res.status(500).json({ error: 'Failed to fetch top customers per quarter' });
     }
 });
+
 
 router.get('/order-products/:orderID', async (req, res) => {
     try {
         const orderID = req.params.orderID;
-        const query = `
-            select product.ProductID                             as ProductID,
-                   product.Name                                  as ProductName,
-                   CONCAT(product.Price, ' x ', contains.Amount) as 'Price x Quantity',
-                   contains.Amount * product.Price               as TotalPrice
-            from contains
-                     join product on contains.ProductID = product.ProductID
-            where OrderID = ${orderID}
-            order by ProductID;
-        `
-
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetOrderProducts(?)', [orderID]);
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (error) {
-        console.log(error);
-        res.status(500).json({error: 'Failed to fetch order products'});
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch order products' });
     }
 });
+
 
 router.get('/tracking-details/:orderID', async (req, res) => {
     try {
         const orderID = req.params.orderID;
-        const query = `
-            select DATE_FORMAT(TimeStamp, '%e-%b-%y %T') as 'Time Stamp', Status
-            from order_tracking
-            where OrderID = ${orderID}
-            order by TimeStamp;
-        `
-
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetTrackingDetails(?)', [orderID]);
+        res.json(rows[0]); // Access the first element, as CALL returns an array of arrays
     } catch (error) {
-        console.log(error);
-        res.status(500).json({error: 'Failed to fetch tracking details'});
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch tracking details' });
     }
 });
+
 
 router.get('/train-assigned-orders', async (req, res) => {
     try {
-        const query = `select tc.OrderID                                      as OrderID,
-                              ts.TrainScheduleID                              as TrainScheduleID,
-                              ts.StoreCity                                    as Destination,
-                              DATE_FORMAT(ts.ScheduleDateTime, '%e-%b-%y %T') as TrainTime
-                       from (select *
-                             from order_details_with_latest_status
-                             where LatestStatus = 'PendingDispatch') as trainAssigned
-                                join train_contains tc on trainAssigned.OrderID = tc.OrderID
-                                join train_schedule_with_destinations ts on tc.TrainScheduleID = ts.TrainScheduleID;
-        `;
-
-        const [rows] = await pool.query(query);
-        console.log(`Fetched train assigned orders: ${rows.length} rows`);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetTrainAssignedOrders()');
+        console.log(`Fetched train assigned orders: ${rows[0].length} rows`);
+        res.json(rows[0]); // Use rows[0] since CALL returns an array of arrays
     } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch train assigned orders'});
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch train assigned orders' });
     }
 });
+
 
 router.get('/orders-in-train', async (req, res) => {
     try {
-        const query = `select tc.OrderID                                      as OrderID,
-                              ts.TrainScheduleID                              as TrainScheduleID,
-                              ts.StoreCity                                    as Destination,
-                              DATE_FORMAT(ts.ScheduleDateTime, '%e-%b-%y %T') as TrainTime
-                       from (select *
-                             from order_details_with_latest_status
-                             where LatestStatus = 'InTrain') as trainAssigned
-                                join train_contains tc on trainAssigned.OrderID = tc.OrderID
-                                join train_schedule_with_destinations ts on tc.TrainScheduleID = ts.TrainScheduleID;
-        `;
-
-        const [rows] = await pool.query(query);
-        console.log(`Fetched train assigned orders: ${rows.length} rows`);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetOrdersInTrain()');
+        console.log(`Fetched orders in train: ${rows[0].length} rows`);
+        res.json(rows[0]); // Access rows[0] since CALL returns an array of arrays
     } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch train assigned orders'});
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch orders in train' });
     }
 });
 
+
+
+// Orders in Store
 router.get('/orders-in-store', async (req, res) => {
     try {
-        const query = `
-            select OrderID, StoreID, StoreCity, RouteID
-            from order_details_with_latest_status
-            where LatestStatus = 'InStore';
-        `
-
-        const [rows] = await pool.query(query);
-        console.log(`Fetched orders in store: ${rows.length} rows`);
-        res.json(rows);
-    } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch orders in store'});
+        const [rows] = await pool.query('CALL GetOrdersByStatus(?)', ['InStore']);
+        res.json(rows[0]);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch orders in store' });
     }
 });
 
+// Orders in Shipment
 router.get('/orders-in-shipment', async (req, res) => {
     try {
-        const query = `
-            select OrderID, StoreID, ShipmentID, ShipmentStatus
-            from order_details_with_latest_status
-            where LatestStatus = 'InShipment';
-        `
-
-
-        const [rows] = await pool.query(query);
-        console.log(`Fetched orders in shipment: ${rows.length} rows`);
-        res.json(rows);
-    } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch orders in store'});
+        const [rows] = await pool.query('CALL GetOrdersByStatus(?)', ['InShipment']);
+        res.json(rows[0]);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch orders in shipment' });
     }
 });
 
+// Orders in Truck
 router.get('/orders-in-truck', async (req, res) => {
     try {
-        const query = `
-            select OrderID, StoreID, TruckID, AssistantID, DriverID
-            from order_details_with_latest_status
-            where LatestStatus = 'InTruck';
-        `
-
-
-        const [rows] = await pool.query(query);
-        console.log(`Fetched orders in truck: ${rows.length} rows`);
-        res.json(rows);
-    } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch orders in truck'});
+        const [rows] = await pool.query('CALL GetOrdersByStatus(?)', ['InTruck']);
+        res.json(rows[0]);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch orders in truck' });
     }
 });
+
+
 
 router.get('/attention-orders', async (req, res) => {
     try {
-        const query = `
-            select OrderID,
-                   StoreCity,
-                   o.CustomerID,
-                   o.CustomerName,
-                   c.Contact       as CustomerContact,
-                   LatestTimeStamp as TimeStamp
-            from order_details_with_latest_status o
-                     join customer c on o.CustomerID = c.CustomerID
-            where LatestStatus = 'Attention';
-        `
-
-        const [rows] = await pool.query(query);
-        console.log(`Fetched attention orders: ${rows.length} rows`);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetAttentionOrders()');
+        console.log(`Fetched attention orders: ${rows[0].length} rows`);
+        res.json(rows[0]); // Access rows[0] to get the results from the stored procedure
     } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch attention orders'});
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch attention orders' });
     }
 });
+
 
 
 router.get('/store-data', async (req, res) => {
-    const query = `
-        select s.StoreID,
-               s.City,
-               COUNT(DISTINCT r.RouteID)     AS Routes,
-               COUNT(DISTINCT a.AssistantID) AS Assistants,
-               COUNT(DISTINCT d.DriverID)    AS Drivers,
-               COUNT(DISTINCT t.TruckID)     AS Trucks
-
-        from store s
-                 join route r on s.StoreID = r.StoreID
-                 join truck t on t.StoreID = s.StoreID
-                 join driver_details_with_employee d on d.StoreID = s.StoreID
-                 join assistant_details_with_employee a on a.StoreID = s.StoreID
-        group by s.StoreID;
-    `
     try {
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetStoreData()');
+        res.json(rows[0]); // Access rows[0] to get the results from the stored procedure
     } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch store data'});
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch store data' });
     }
 });
+
 
 router.get('/manager-data', async (req, res) => {
     try {
-
-        const query = `
-            select e.StoreID, s.City, EmployeeID, Name, Contact, Address
-            from employee e
-                     join store s on e.StoreID = s.StoreID
-            where Type = 'StoreManager';
-        `
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetManagerData()');
+        res.json(rows[0]); // Access rows[0] to get the results from the stored procedure
     } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch manager data'});
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch manager data' });
     }
 });
+
 
 router.get('/top-customers', async (req, res) => {
     try {
-        const query = `
-            select CustomerID, Name, TotalOrders, TotalRevenue
-            from customer_report
-            order by TotalRevenue desc
-            limit 100;
-        `
-
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetTopCustomers()');
+        res.json(rows[0]); // Access rows[0] to get the results from the stored procedure
     } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch top customers'});
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch top customers' });
     }
 });
+
 
 export default router;

@@ -215,9 +215,7 @@ CREATE INDEX idx_username ON customer (Username);
 
 
 DELIMITER //
-# Triggers
 
-# Remember to comment this trigger when running order creation script
 CREATE TRIGGER after_order_insert
     AFTER INSERT
     ON `Order`
@@ -430,30 +428,6 @@ from assistant a
          join employee e on a.EmployeeID = e.EmployeeID;
 //
 
-
-create view truck_schedule_with_details as
-select ts.TruckScheduleID,
-       ts.StoreID,
-       ts.ShipmentID,
-       ts.ScheduleDateTime,
-       ts.RouteID,
-       ts.AssistantID,
-       ts.DriverID,
-       ts.TruckID,
-       ts.Hours,
-       ts.Status,
-       s.City as StoreCity,
-       a.Name as AssistantName,
-       d.Name as DriverName,
-       t.LicencePlate
-from truckschedule ts
-         join truck t on ts.TruckID = t.TruckID
-         join route r on ts.RouteID = r.RouteID
-         join store s on t.StoreID = s.StoreID
-         join driver_details_with_employee d on ts.DriverID = d.DriverID
-         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID;
-
-
 # To get the order details with the latest status and some more details
 CREATE VIEW Order_Details_With_Latest_Status AS
 SELECT o.OrderID,
@@ -506,6 +480,41 @@ FROM `Order` o
 ;
 //
 
+# Truck schedule with details
+create view truck_schedule_with_details as
+select ts.TruckScheduleID,
+       ts.StoreID,
+       ts.ShipmentID,
+       ts.ScheduleDateTime,
+       ts.RouteID,
+       ts.AssistantID,
+       ts.DriverID,
+       ts.TruckID,
+       ts.Hours,
+       ts.Status,
+       s.City as StoreCity,
+       a.Name as AssistantName,
+       d.Name as DriverName,
+       t.LicencePlate,
+       Status.TotalOrders,
+       Status.Delivered
+from truckschedule ts
+         join truck t on ts.TruckID = t.TruckID
+         join route r on ts.RouteID = r.RouteID
+         join store s on t.StoreID = s.StoreID
+         join driver_details_with_employee d on ts.DriverID = d.DriverID
+         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID
+         join (select Shipment_contains.ShipmentID,
+                      COUNT(Shipment_contains.OrderID)          as TotalOrders,
+                      SUM(IF(LatestStatus = 'Delivered', 1, 0)) as Delivered
+               from shipment_contains
+                        join order_details_with_latest_status
+                             on shipment_contains.OrderID = Order_Details_With_Latest_Status.OrderID
+               group by ShipmentID) as status on ts.ShipmentID = status.ShipmentID
+;
+
+
+# To get the order details with the latest status and some more details
 CREATE VIEW Quarterly_Product_Report AS
 SELECT YEAR(o.OrderDate)       AS Year,
        QUARTER(o.OrderDate)    AS Quarter,
@@ -656,7 +665,8 @@ BEGIN
     -- Open cursor and loop through trains
     OPEN train_cursor;
 
-    read_loop: LOOP
+    read_loop:
+    LOOP
         FETCH train_cursor INTO train_id, full_capacity, store_id, train_time, train_day;
 
         IF done THEN
@@ -667,15 +677,16 @@ BEGIN
         SET date_ptr = start_date;
 
         -- Loop through dates
-        WHILE date_ptr <= end_date DO
-            IF DAYNAME(date_ptr) = train_day THEN
-                INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
-                VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
+        WHILE date_ptr <= end_date
+            DO
+                IF DAYNAME(date_ptr) = train_day THEN
+                    INSERT IGNORE INTO TrainSchedule (FilledCapacity, TrainID, ScheduleDateTime, Status)
+                    VALUES (0, train_id, TIMESTAMP(CONCAT(date_ptr, ' ', train_time)), 'Not Completed');
 
-                SET schedules_added = schedules_added + 1;
-            END IF;
-            SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
-        END WHILE;
+                    SET schedules_added = schedules_added + 1;
+                END IF;
+                SET date_ptr = DATE_ADD(date_ptr, INTERVAL 1 DAY);
+            END WHILE;
     END LOOP;
 
     CLOSE train_cursor;
@@ -685,57 +696,19 @@ END //
 
 
 
-
--- Trigger to check work hours for driver and assistant when creating a truck schedule
--- CREATE TRIGGER check_schedule_work_hours BEFORE INSERT ON TruckSchedule
--- FOR EACH ROW
--- BEGIN
---     DECLARE driverWorkingHours INT;
---     DECLARE driverCompletedHours INT;
---     DECLARE assistantWorkingHours INT;
---     DECLARE assistantCompletedHours INT;
---     DECLARE scheduleHours TIME;
-
---     -- Get working and completed hours for the driver
---     SELECT WorkingHours, CompletedHours INTO driverWorkingHours, driverCompletedHours
---     FROM Driver
---     WHERE DriverID = NEW.DriverID;
-
---     -- Get working and completed hours for the assistant
---     SELECT WorkingHours, CompletedHours INTO assistantWorkingHours, assistantCompletedHours
---     FROM Assistant
---     WHERE AssistantID = NEW.AssistantID;
-
---     -- Get the hours for the schedule
---     SET scheduleHours = NEW.Hours;
-
---     -- Check if the driver's hours exceed
---     IF (driverCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > driverWorkingHours THEN
---         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds driver\'s available work hours';
---     END IF;
-
---     -- Check if the assistant's hours exceed
---     IF (assistantCompletedHours + TIME_TO_SEC(scheduleHours)/3600) > assistantWorkingHours THEN
---         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Error: Truck schedule exceeds assistant\'s available work hours';
---     END IF;
--- END
-
-
-
-
 # ----------------------------------Procedures-------------------------------------
 
 
 -- Stored Procedures new ones here
 
-CREATE PROCEDURE CreateOrderWithItems (
+CREATE PROCEDURE CreateOrderWithItems(
     IN p_CustomerID INT,
     IN p_Value DECIMAL(10, 2),
     IN p_OrderDate DATE,
     IN p_DeliveryDate DATE,
     IN p_RouteID INT,
     IN p_TotalVolume DECIMAL(10, 2),
-    IN p_Products JSON  -- JSON array to store multiple products (ProductID, Amount)
+    IN p_Products JSON -- JSON array to store multiple products (ProductID, Amount)
 )
 BEGIN
     DECLARE productID INT;
@@ -757,7 +730,8 @@ BEGIN
     SET productCount = JSON_LENGTH(p_Products);
 
     -- Loop through the products and insert them into the Contains table
-    WHILE productIndex < productCount DO
+    WHILE productIndex < productCount
+        DO
             -- Extract ProductID and Amount from JSON array
             SET productID = JSON_UNQUOTE(JSON_EXTRACT(p_Products, CONCAT('$[', productIndex, '].ProductID')));
             SET amount = JSON_UNQUOTE(JSON_EXTRACT(p_Products, CONCAT('$[', productIndex, '].Amount')));
@@ -775,7 +749,6 @@ BEGIN
 END//
 
 
-
 -- Stored Procedure to get routes by city
 
 CREATE PROCEDURE GetRoutesByCity(IN cityName VARCHAR(255))
@@ -786,17 +759,15 @@ BEGIN
     WHERE City = cityName;
 END//
 
-DELIMITER ;
 
--- procedure  create for profile page--------------
-DELIMITER //
+
+# -------------procedure  create for profile page--------------
 
 CREATE PROCEDURE GetCustomerReport(IN customerId INT)
 BEGIN
     SELECT * FROM customer_profile c WHERE c.CustomerID = customerId;
 END //
 
-DELIMITER ;
 
 
 -- create a view -------------------------
@@ -812,5 +783,9 @@ SELECT
     Contact
 FROM 
     Customer;
+//
 
 
+
+
+DELIMITER ;
