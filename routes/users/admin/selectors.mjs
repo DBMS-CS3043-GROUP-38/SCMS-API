@@ -10,84 +10,60 @@ router.get('/test', (req, res) => {
 
 router.get('/today-trains', async (req, res) => {
     try {
-        const query = `
-            select 
-                TrainScheduleID as trainID,
-                DATE_FORMAT(ScheduleDateTime, '%a %T') as Time,
-                StoreCity as Destination
-            from 
-                train_schedule_with_destinations 
-            where DATE(ScheduleDateTime) <= CURDATE() and Status = 'Not Completed' order by ScheduleDateTime;
-        `;
-
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetTodayTrains()');
+        res.json(rows[0]);
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to fetch trains today'});
+        res.status(500).json({ error: 'Failed to fetch trains today' });
     }
 });
+
 
 router.get('/available-years', async (req, res) => {
     try {
-        const query = `
-            select distinct YEAR(OrderDate) as Year
-            from order_details_with_latest_status
-            order by Year desc;
-        `;
-        const [rows] = await pool.query(query);
-        console.log(`Fetched years: ${JSON.stringify(rows)}`);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetAvailableYears()');
+        console.log(`Fetched years: ${JSON.stringify(rows[0])}`);
+        res.json(rows[0]); // Access the first element as CALL returns an array of arrays
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to fetch available years'});
+        res.status(500).json({ error: 'Failed to fetch available years' });
     }
-})
+});
+
 
 router.get('/available-quarters/:year', async (req, res) => {
     try {
-        const query = `
-            select distinct QUARTER(OrderDate) as Quarter
-            from order_details_with_latest_status
-            where YEAR(OrderDate) = ?
-            order by Quarter desc;
-        `;
-        const [rows] = await pool.query(query, [req.params.year]);
-        console.log(`Fetched quarters for year ${req.params.year}: ${JSON.stringify(rows)}`);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetAvailableQuarters(?)', [req.params.year]);
+        console.log(`Fetched quarters for year ${req.params.year}: ${JSON.stringify(rows[0])}`);
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to fetch available quarters'});
+        res.status(500).json({ error: 'Failed to fetch available quarters' });
     }
 });
+
 
 router.get('/get-stores', async (req, res) => {
     try {
-        const query = `
-            select StoreID, City
-            from store;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetStores()');
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (e) {
         console.error(e);
-        res.status(500).json({error: 'Failed to fetch stores'});
+        res.status(500).json({ error: 'Failed to fetch stores' });
     }
 });
 
+
 router.get('/product-categories', async (req, res) => {
     try {
-        const query = `
-            select distinct Type as category
-            from product;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query('CALL GetProductCategories()');
+        res.json(rows[0]); // Access the first element since CALL returns an array of arrays
     } catch (error) {
         console.log(error);
-        res.status(500).json({error: 'Failed to fetch product categories'});
+        res.status(500).json({ error: 'Failed to fetch product categories' });
     }
 });
+
 
 
 export default router;

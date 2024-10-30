@@ -215,9 +215,7 @@ CREATE INDEX idx_username ON customer (Username);
 
 
 DELIMITER //
-# Triggers
 
-# Remember to comment this trigger when running order creation script
 CREATE TRIGGER after_order_insert
     AFTER INSERT
     ON `Order`

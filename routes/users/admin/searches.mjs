@@ -55,319 +55,55 @@ router.get('/order/:id', async (req, res) => {
     }
 });
 
-router.get('/customer', async (req, res) => {
-    const {by, term} = req.query;
-    let query = '';
-    let queryParams = [];
-
-    if (!by || !term) {
-        query = `
-            SELECT CustomerID   AS 'Customer ID',
-                   Name         AS 'Customer Name',
-                   City         AS 'City',
-                   Contact      AS 'Phone',
-                   Address      AS 'Address',
-                   TotalRevenue AS 'Total Revenue',
-                   TotalOrders  AS 'Total Orders'
-            FROM customer_report;
-        `;
-    } else {
-        switch (by) {
-            case 'name':
-                query = `
-                    SELECT CustomerID   AS 'Customer ID',
-                           Name         AS 'Customer Name',
-                           City         AS 'City',
-                           Contact      AS 'Phone',
-                           Address      AS 'Address',
-                           TotalRevenue AS 'Total Revenue',
-                           TotalOrders  AS 'Total Orders'
-                    FROM customer_report
-                    WHERE Name LIKE ?;
-                `;
-                queryParams = [`%${term}%`];
-                break;
-            case 'id':
-                query = `
-                    SELECT CustomerID   AS 'Customer ID',
-                           Name         AS 'Customer Name',
-                           City         AS 'City',
-                           Contact      AS 'Phone',
-                           Address      AS 'Address',
-                           TotalRevenue AS 'Total Revenue',
-                           TotalOrders  AS 'Total Orders'
-                    FROM customer_report
-                    WHERE CustomerID = ?;
-                `;
-                queryParams = [term];
-                break;
-            default:
-                res.status(400).json({error: 'Invalid search parameter'});
-                return;
-        }
-    }
+// Generic route handler function
+const handleEntitySearch = (entityType) => async (req, res) => {
+    const { by, term } = req.query;
 
     try {
-        const [rows] = await pool.query(query, queryParams);
-        res.json(rows);
+        const [rows] = await pool.query('CALL search_entity(?, ?, ?)', [entityType, by || null, term || null]);
+        // MySQL returns stored procedure results in an array where the first element contains our result set
+        res.json(rows[0]);
     } catch (error) {
-        console.error('Database query failed:', error);
-        res.status(500).json({error: 'Database query failed'});
+        console.error(`Database query failed for ${entityType}:`, error);
+        res.status(500).json({ error: 'Database query failed' });
     }
-});
+};
 
-router.get('/driver', async (req, res) => {
-    const {by, term} = req.query;
-    let query = '';
-    let queryParams = [];
+// Simplified route definitions
+router.get('/customer', handleEntitySearch('customer'));
+router.get('/driver', handleEntitySearch('driver'));
+router.get('/assistant', handleEntitySearch('assistant'));
+router.get('/route', handleEntitySearch('route'));
+router.get('/truck', handleEntitySearch('truck'));
 
-    if (!by || !term) {
-        query = `
-            select DriverID       AS 'Driver ID',
-                   Name           AS 'Driver Name',
-                   StoreID        AS 'Store ID',
-                   Contact        AS 'Phone',
-                   Status         AS 'Availability',
-                   CompletedHours AS 'CompletedHours',
-                   WorkingHours   AS 'WorkHours'
-            from driver_details_with_employee;
-        `;
-    } else {
-        switch (by) {
-            case 'name':
-                query = `
-                    select DriverID       AS 'Driver ID',
-                           Name           AS 'Driver Name',
-                           StoreID        AS 'Store ID',
-                           Contact        AS 'Phone',
-                           Status         AS 'Availability',
-                           CompletedHours AS 'CompletedHours',
-                           WorkingHours   AS 'WorkHours'
-                    from driver_details_with_employee
-                    where Name LIKE ?;
-                `;
-                queryParams = [`%${term}%`];
-                break;
-            case 'id':
-                query = `
-                    select DriverID       AS 'Driver ID',
-                           Name           AS 'Driver Name',
-                           StoreID        AS 'Store ID',
-                           Contact        AS 'Phone',
-                           Status         AS 'Availability',
-                           CompletedHours AS 'CompletedHours',
-                           WorkingHours   AS 'WorkHours'
-                    from driver_details_with_employee
-                    where DriverID = ?;
-                `;
-                queryParams = [term];
-                break;
-            default:
-                res.status(400).json({error: 'Invalid search parameter'});
-                return;
-        }
-    }
-    try {
-        const [rows] = await pool.query(query, queryParams);
-        res.json(rows);
-    } catch (error) {
-        console.error('Database query failed:', error);
-        res.status(500).json({error: 'Database query failed'});
-    }
-});
-
-router.get('/assistant', async (req, res) => {
-    const {by, term} = req.query;
-    let query = '';
-    let queryParams = [];
-
-    if (!by || !term) {
-        query = `
-            select AssistantID    AS 'Assistant ID',
-                   Name           AS 'Assistant Name',
-                   StoreID        AS 'Store ID',
-                   Contact        AS 'Phone',
-                   Status         AS 'Availability',
-                   CompletedHours AS 'CompletedHours',
-                   WorkingHours   AS 'WorkHours'
-            from assistant_details_with_employee;
-        `;
-    } else {
-        switch (by) {
-            case 'name':
-                query = `
-                    select AssistantID    AS 'Assistant ID',
-                           Name           AS 'Assistant Name',
-                           StoreID        AS 'Store ID',
-                           Contact        AS 'Phone',
-                           Status         AS 'Availability',
-                           CompletedHours AS 'CompletedHours',
-                           WorkingHours   AS 'WorkHours'
-                    from assistant_details_with_employee
-                    where Name LIKE ?;
-                `;
-                queryParams = [`%${term}%`];
-                break;
-            case 'id':
-                query = `
-                    select AssistantID    AS 'Assistant ID',
-                           Name           AS 'Assistant Name',
-                           StoreID        AS 'Store ID',
-                           Contact        AS 'Phone',
-                           Status         AS 'Availability',
-                           CompletedHours AS 'CompletedHours',
-                           WorkingHours   AS 'WorkHours'
-                    from assistant_details_with_employee
-                    where AssistantID = ?;
-                `;
-                queryParams = [term];
-                break;
-            default:
-                res.status(400).json({error: 'Invalid search parameter'});
-                return;
-        }
-    }
-    try {
-        const [rows] = await pool.query(query, queryParams);
-        res.json(rows);
-    } catch (error) {
-        console.error('Database query failed:', error);
-        res.status(500).json({error: 'Database query failed'});
-    }
-});
-
-router.get('/route', async (req, res) => {
-    const {by, term} = req.query;
-    let query = '';
-    let queryParams = [];
-
-    if (!by || !term) {
-        query = `
-            select RouteID       AS 'Route ID',
-                   StoreID       AS 'Store ID',
-                   Distance      AS 'Distance(KM)',
-                   Time_duration AS 'Time Duration',
-                   Description   AS 'Description'
-            from route;
-        `;
-    } else {
-        switch (by) {
-            case 'id':
-                query = `
-                    select RouteID       AS 'Route ID',
-                           StoreID       AS 'Store ID',
-                           Distance      AS 'Distance(KM)',
-                           Time_duration AS 'Time Duration',
-                           Description   AS 'Description'
-                    from route
-                    where RouteID = ?;
-                `;
-                queryParams = [term];
-                break;
-            default:
-                res.status(400).json({error: 'Invalid search parameter'});
-                return;
-        }
-    }
-    try {
-        const [rows] = await pool.query(query, queryParams);
-        res.json(rows);
-    } catch (error) {
-        console.error('Database query failed:', error);
-        res.status(500).json({error: 'Database query failed'});
-    }
-})
-
-router.get('/truck', async (req, res) => {
-    const {by, term} = req.query;
-    let query = '';
-    let queryParams = [];
-
-
-    if (!by || !term) {
-        query = `
-            select td.TruckID    AS 'Truck ID',
-                   LicencePlate  AS 'Licence Plate',
-                   StoreID       AS 'Store ID',
-                   TotalDistance AS 'Total Distance(KM)',
-                   Status        as 'Availability'
-            from truck
-                     join truck_distances td on truck.TruckID = td.TruckID order by td.TruckID;
-        `;
-    } else {
-        switch (by) {
-            case 'id':
-                query = `
-                    select td.TruckID    AS 'Truck ID',
-                            LicencePlate  AS 'Licence Plate',
-                            StoreID       AS 'Store ID',
-                            TotalDistance AS 'Total Distance(KM)',
-                            Status        as 'Availability'
-                    from truck
-                                join truck_distances td on truck.TruckID = td.TruckID
-                    where td.TruckID = ? order by td.TruckID;
-                `;
-                queryParams = [term];
-                break;
-            case 'name':
-                query = `
-                    select td.TruckID    AS 'Truck ID',
-                            LicencePlate  AS 'Licence Plate',
-                            StoreID       AS 'Store ID',
-                            TotalDistance AS 'Total Distance(KM)',
-                            Status        as 'Availability'
-                    from truck
-                                join truck_distances td on truck.TruckID = td.TruckID
-                    where LicencePlate LIKE ? order by td.TruckID;
-                `;
-                queryParams = [`%${term}%`];
-                break;
-            default:
-                res.status(400).json({error: 'Invalid search parameter'});
-                return;
-        }
-    }
-    try {
-        const [rows] = await pool.query(query, queryParams);
-        res.json(rows);
-    } catch (error) {
-        console.error('Database query failed:', error);
-        res.status(500).json({error: 'Database query failed'});
-    }
-})
 
 router.get('/product/:id', async (req, res) => {
     try {
-        const id = req.params.id;
-        const query = `
-            select ProductID as id, Name as name, Type as category, Price as price
-            from product
-            where ProductID = ${id};
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const id = parseInt(req.params.id, 10);
+        const query = `CALL GetProductById(?)`;
+        const [rows] = await pool.query(query, [id]);
+
+        // Since stored procedures return results as an array of arrays, access the first array for results
+        res.json(rows[0]);
     } catch (error) {
         console.log(error);
-        res.status(500).json({error: 'Failed to fetch products'});
+        res.status(500).json({ error: 'Failed to fetch product' });
     }
-})
+});
+
 
 router.get('/product-sales/:id', async (req, res) => {
     try {
         const id = req.params.id;
-        const query = `
-            SELECT CONCAT(Year, ' - ', Quarter) AS Quarter, TotalRevenue
-            FROM quarterly_product_report
-            WHERE ProductID = ${id}
-            ORDER BY Year, Quarter;
-        `;
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const query = `CALL GetProductSales(?)`;
+        const [rows] = await pool.query(query, [id]);
+        res.json(rows[0]); // Accessing the first element since CALL returns results in an array
     } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch product sales'});
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch product sales' });
     }
-})
+});
+
 
 
 export default router;
