@@ -59,7 +59,7 @@ cron.schedule('* * * * *', async () => {
         `);
 
         for (let shipment of shipments) {
-            if ((parseFloat(shipment.FilledCapacity) >= 0.001 * parseFloat(shipment.Capacity) || isOlderThan7Days(shipment.CreatedDate))) {
+            if ((parseFloat(shipment.FilledCapacity) >= 0.8 * parseFloat(shipment.Capacity) || isOlderThan7Days(shipment.CreatedDate))) {
                 await connection.promise().query(`
                     UPDATE shipment
                     SET Status = 'Ready'
