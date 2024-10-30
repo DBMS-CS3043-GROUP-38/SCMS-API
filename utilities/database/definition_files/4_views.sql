@@ -230,5 +230,19 @@ WHERE ts.Status = 'Completed'
 GROUP BY ts.TruckID;
 //
 
+# Rashmika customer views
+CREATE VIEW customer_profile AS
+SELECT
+    CustomerID,
+    Name,
+    Username,
+    Address,
+    Type,
+    City,
+    Contact
+FROM
+    Customer;
+//
+
 
 DELIMITER ;
