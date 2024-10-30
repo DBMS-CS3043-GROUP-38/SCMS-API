@@ -91,7 +91,8 @@ cron.schedule('* * * * *', async () => {
             const [trucks] = await connection.promise().query(`
                 SELECT TruckID
                 FROM truck
-                WHERE Status = 'Available' AND StoreID = ?
+                WHERE Status = 'Available'
+                  AND StoreID = ?
                 LIMIT 1
             `, [shipment.StoreID]);
 
@@ -103,7 +104,7 @@ cron.schedule('* * * * *', async () => {
 
             const [drivers] = await connection.promise().query(`
                 SELECT DriverID, CompletedHours
-                FROM AvailableDrivers 
+                FROM AvailableDrivers
                 WHERE StoreID = ?
             `, [shipment.StoreID]);
 
@@ -194,18 +195,25 @@ cron.schedule('* * * * *', async () => {
             `, [shipmentAssistant.AssistantID]);
 
             await connection.promise().query(`
-                INSERT INTO truckschedule (TruckID, DriverID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours, Status, RouteID)
-                VALUES (?, ?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 HOUR), ?, ?, 'Not Completed', ?)
+                INSERT INTO truckschedule (TruckID, DriverID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours,
+                                           Status, RouteID)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'Not Completed', ?)
             `, [
                 truckID,
                 shipmentDriver.DriverID,
                 shipmentAssistant.AssistantID,
                 shipment.ShipmentID,
+                new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),  // ScheduleDateTime in UTC
                 shipment.StoreID,
-                secondsToTime(routeDuration),
+                secondsToTime(routeDuration),  // Hours in HH:MM:SS format
                 RouteID
             ]);
 
+            await connection.promise().query(`
+                UPDATE Shipment AS sh
+                SET Status = 'Completed'
+                WHERE sh.ShipmentID = ?
+            `, [shipment.ShipmentID]);
 
             console.log(`Driver ${shipmentDriver.DriverID} and assistant ${shipmentAssistant.AssistantID} assigned to truck ${truckID} to deliver shipment ${shipment.ShipmentID}.`);
         }
