@@ -177,12 +177,8 @@ end;
 //
 
 
-DELIMITER ;
-
 
 -- Update driver related triggers
-
-DELIMITER //
 
 
 CREATE TRIGGER update_completed_hours_and_availability_and_deliver_orders
