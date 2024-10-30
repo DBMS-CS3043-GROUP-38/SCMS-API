@@ -246,7 +246,7 @@ BEGIN
   IF NEW.Status = 'Completed' AND OLD.Status = 'In Progress' THEN
 	UPDATE Shipment AS sh
     SET Status = "Completed" 
-    WHERE sh.ShipmentID = NEW.ShipmentID;
+    WHERE sh.ShipmentID = NEW.ShipmentID;  
 
     -- Insert new entries in Order_tracking for each order in Shipment_contains
     INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
