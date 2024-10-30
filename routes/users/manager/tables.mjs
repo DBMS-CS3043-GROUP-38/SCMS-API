@@ -241,138 +241,114 @@ router.get('/drivers', async (req, res) => {
 });
 
 
-
 router.get('/assistants', async (req, res) => {
     try {
         const StoreID = req.user.StoreID;
-        const query = `
-            select AssistantID    AS 'Assistant ID',
-                   Name           AS 'Assistant Name',
-                   StoreID        AS 'Store ID',
-                   Contact        AS 'Phone',
-                   Status         AS 'Availability',
-                   CompletedHours AS 'CompletedHours',
-                   WorkingHours   AS 'WorkHours'
-            from assistant_details_with_employee
-            where StoreID = ${StoreID};
-        `;
+        const query = 'CALL GetAssistantsByStore(?)'; // Use the stored procedure
 
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query(query, [StoreID]);
+
+        if (rows[0].length === 0) {
+            return res.status(404).json({ message: 'No assistants found' });
+        }
+
+        res.json(rows[0]); // Return the first result set
     } catch (e) {
         console.log(e);
-        res.status(500).json({error: 'Failed to fetch assistant'});
+        res.status(500).json({ error: 'Failed to fetch assistants' });
     }
 });
+
 
 router.get('/trucks', async (req, res) => {
     try {
         const StoreID = req.user.StoreID;
-        const query = `
-            select td.TruckID    AS 'Truck ID',
-                   LicencePlate  AS 'Licence Plate',
-                   TotalDistance AS 'Total Distance(KM)',
-                   Status        as 'Availability'
-            from truck
-                     join truck_distances td on truck.TruckID = td.TruckID
-            where StoreID = ${StoreID}
-            order by td.TruckID;
-        `;
+        const query = 'CALL GetTrucksByStore(?)'; // Use the stored procedure
 
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query(query, [StoreID]);
+
+        if (rows[0].length === 0) {
+            return res.status(404).json({ message: 'No trucks found' });
+        }
+
+        res.json(rows[0]); // Return the first result set
     } catch (e) {
         console.log(e);
-        res.status(500).json({error: 'Failed to fetch trucks'});
+        res.status(500).json({ error: 'Failed to fetch trucks' });
     }
 });
+
 
 router.get('/routes', async (req, res) => {
     try {
         const StoreID = req.user.StoreID;
-        const query = `
-            select RouteID       AS 'Route ID',
-                   StoreID       AS 'Store ID',
-                   Distance      AS 'Distance(KM)',
-                   Time_duration AS 'Time Duration',
-                   Description   AS 'Description'
-            from route
-            where StoreID = ${StoreID};
-        `;
+        const query = 'CALL GetRoutesByStore(?)'; // Use the stored procedure
 
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query(query, [StoreID]);
+
+        if (rows[0].length === 0) {
+            return res.status(404).json({ message: 'No routes found' });
+        }
+
+        res.json(rows[0]); // Return the first result set
     } catch (e) {
         console.log(e);
-        res.status(500).json({error: 'Failed to fetch routes'});
+        res.status(500).json({ error: 'Failed to fetch routes' });
     }
 });
+
 
 router.get('/orders-by-shipment/:shipmentID', async (req, res) => {
     try {
         const shipmentID = req.params.shipmentID;
-        const query = `
-            select OrderID                                     as orderID,
-                   order_details_with_latest_status.CustomerID as customerID,
-                   CustomerName                                as customerName,
-                   RouteID                                     as routeID,
-                   Address                                     as address,
-                   Contact                                     as contact,
-                   TotalVolume                                 as volume,
-                   OrderDate                                   as orderDate
-            from order_details_with_latest_status
-                     join customer on customer.CustomerID = order_details_with_latest_status.CustomerID
-            where ShipmentID = ${shipmentID};
-        `
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const query = 'CALL GetOrdersByShipment(?)'; // Use the stored procedure
+
+        const [rows] = await pool.query(query, [shipmentID]);
+
+        if (rows[0].length === 0) {
+            return res.status(404).json({ message: 'No orders found for this shipment' });
+        }
+
+        res.json(rows[0]); // Return the first result set
     } catch (e) {
         console.log(e);
-        res.status(500).json({error: 'Failed to fetch orders by shipment'});
+        res.status(500).json({ error: 'Failed to fetch orders by shipment' });
     }
 });
+
 
 router.get('/truck-schedule/:shipmentID', async (req, res) => {
     try {
         const shipmentID = req.params.shipmentID;
-        const query = `
-            select *
-            from truck_schedule_with_details
-            where ShipmentID = ${shipmentID};
-        `
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const query = 'CALL GetTruckScheduleByShipment(?)'; // Use the stored procedure
+
+        const [rows] = await pool.query(query, [shipmentID]);
+
+        if (rows[0].length === 0) {
+            return res.status(404).json({ message: 'No truck schedule found for this shipment' });
+        }
+
+        res.json(rows[0]); // Return the first result set
     } catch (e) {
         console.log(e);
-        res.status(500).json({error: 'Failed to fetch truck schedule'});
+        res.status(500).json({ error: 'Failed to fetch truck schedule' });
     }
 });
+
 
 router.get('/truck-schedules', async (req, res) => {
     try {
         const storeID = req.user.StoreID;
-        const query = `
-            select 
-                TruckScheduleID as 'Schedule ID',
-                ShipmentID as 'Shipment ID',
-                TruckID as 'Truck ID',
-                ShipmentID as 'Shipment ID',
-                DriverID as 'Driver ID',
-                DriverName as 'Driver Name',
-                AssistantID as 'Assistant ID',
-                AssistantName as 'Assistant Name',
-                Delivered as 'Delivered',
-                TotalOrders as 'Total Orders',
-                ScheduleDateTime as 'Schedule Time',
-            Status as 'Status'
-            from truck_schedule_with_details where  StoreID = ${storeID};
-        `
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const query = 'CALL GetTruckSchedulesByStore(?)'; // Call the stored procedure
+
+        const [rows] = await pool.query(query, [storeID]);
+
+        res.json(rows[0]); // Return the first result set
     } catch (e) {
         console.log(e);
-        res.status(500).json({error: 'Failed to fetch truck schedules'});
+        res.status(500).json({ error: 'Failed to fetch truck schedules' });
     }
-})
+});
+
 
 export default router;

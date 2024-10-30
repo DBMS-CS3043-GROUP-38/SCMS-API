@@ -241,6 +241,83 @@ BEGIN
         StoreID = sid;
 END //
 
+CREATE PROCEDURE GetTrucksByStore(IN sid INT)
+BEGIN
+    SELECT
+        td.TruckID AS 'Truck ID',
+        LicencePlate AS 'Licence Plate',
+        TotalDistance AS 'Total Distance(KM)',
+        Status AS 'Availability'
+    FROM
+        truck
+            JOIN
+        truck_distances td ON truck.TruckID = td.TruckID
+    WHERE
+        StoreID = sid
+    ORDER BY
+        td.TruckID;
+END //
+
+CREATE PROCEDURE GetRoutesByStore(IN sid INT)
+BEGIN
+    SELECT
+        RouteID AS 'Route ID',
+        StoreID AS 'Store ID',
+        Distance AS 'Distance(KM)',
+        Time_duration AS 'Time Duration',
+        Description AS 'Description'
+    FROM
+        route
+    WHERE
+        StoreID = sid;
+END //
+
+
+CREATE PROCEDURE GetOrdersByShipment(IN sid INT)
+BEGIN
+    SELECT
+        OrderID AS orderID,
+        order_details_with_latest_status.CustomerID AS customerID,
+        CustomerName AS customerName,
+        RouteID AS routeID,
+        Address AS address,
+        Contact AS contact,
+        TotalVolume AS volume,
+        OrderDate AS orderDate
+    FROM
+        order_details_with_latest_status
+            JOIN
+        customer ON customer.CustomerID = order_details_with_latest_status.CustomerID
+    WHERE
+        ShipmentID = sid;
+END //
+
+CREATE PROCEDURE GetTruckScheduleByShipment(IN shid INT)
+BEGIN
+    SELECT *
+    FROM truck_schedule_with_details
+    WHERE ShipmentID = shid;
+END //
+
+CREATE PROCEDURE GetTruckSchedulesByStore(IN storeId INT)
+BEGIN
+    SELECT
+        TruckScheduleID AS 'Schedule ID',
+        ShipmentID AS 'Shipment ID',
+        TruckID AS 'Truck ID',
+        DriverID AS 'Driver ID',
+        DriverName AS 'Driver Name',
+        AssistantID AS 'Assistant ID',
+        AssistantName AS 'Assistant Name',
+        Delivered AS 'Delivered',
+        TotalOrders AS 'Total Orders',
+        ScheduleDateTime AS 'Schedule Time',
+        Status AS 'Status'
+    FROM
+        truck_schedule_with_details
+    WHERE
+        StoreID = storeId;
+END //
 
 
 DELIMITER ;
