@@ -8,7 +8,9 @@
     "start": "nodemon index.mjs",
     "initialise-database": "node utilities/databaseInitialisation/index.mjs",
     "reset-db": "node utilities/database/run-ddl.mjs",
-    "simulate-orders": "node utilities/databaseInitialisation/OrderPlacingSimulation.js"
+    "simulate-orders": "node utilities/databaseInitialisation/OrderPlacingSimulation.js",
+    "truck-scheduler": "node ./daemon/truckScheduler.mjs",
+    "truck-scheduler-test": "node ./daemon/test.mjs"
   },
   "repository": {
     "type": "git",

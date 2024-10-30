@@ -106,7 +106,7 @@ async function createOrdersForEachDay(
     routeCount,
     customerCount
 ) {
-    const days = 365 * 3; // Past two years
+    const days = 365 * 2; // Past two years
 
     for (let day = days; day >= 20; day--) {
         const orderDate = calculatePastDate(day);

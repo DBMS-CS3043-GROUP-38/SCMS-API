@@ -4,6 +4,7 @@ import dashboardRoutes from './routes/dashboard/dashboard.mjs';
 import customerRoutes from './routes/users/customer/customerRoutes.mjs';
 import cors from 'cors';
 import driverRoute from './routes/users/driver/driverRoutes.mjs';
+import assistantRoute from './routes/users/assistants/assistantRoutes.mjs';
 dotenv.config();
  
 const app = express();
@@ -11,16 +12,13 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(cors( 
-    {
-        origin: ['http://localhost:3001', 'http://localhost:3002', 'http://localhost:3000'],
-        credentials: true
-    }
+app.use(cors(
 )); 
 
 // Routes
 app.use('/dashboard', dashboardRoutes);
 app.use('/driver', driverRoute);
+app.use('/assistant', assistantRoute);
 
  
 //Routes in customer UI
