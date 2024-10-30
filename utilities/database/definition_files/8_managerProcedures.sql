@@ -85,5 +85,162 @@ BEGIN
     GROUP BY LatestStatus;
 END //
 
+CREATE PROCEDURE GetTodayTrainsByStore(IN sid INT)
+BEGIN
+    SELECT
+        TrainScheduleID AS trainID,
+        DATE_FORMAT(ScheduleDateTime, '%a %T') AS Time,
+        StoreCity AS Destination
+    FROM
+        train_schedule_with_destinations
+    WHERE
+        DATE(ScheduleDateTime) = CURDATE()
+      AND Status = 'In Progress'
+      AND StoreID = sid
+    ORDER BY
+        ScheduleDateTime;
+END //
+
+CREATE PROCEDURE GetTrainsTodayByStore(IN sid INT)
+BEGIN
+    SELECT
+        TrainScheduleID AS id,
+        StoreCity AS destination,
+        FilledPercentage AS capacityFilled,
+        FullCapacity AS fullCapacity,
+        ScheduleDateTime AS time
+    FROM
+        train_schedule_with_destinations
+    WHERE
+        DATE(ScheduleDateTime) = CURDATE()
+      AND StoreID = sid
+    ORDER BY
+        ScheduleDateTime;
+END //
+
+CREATE PROCEDURE GetActiveTrainsByStore(IN sid INT)
+BEGIN
+    SELECT
+        TrainID AS id,
+        TrainScheduleID AS scheduleID,
+        StoreCity AS destination,
+        FilledPercentage AS capacityFilled,
+        FullCapacity AS fullCapacity,
+        ScheduleDateTime AS time,
+        Status AS status
+    FROM
+        train_schedule_with_destinations
+    WHERE
+        StoreID = sid
+      AND Status != 'Completed'
+    ORDER BY
+        ScheduleDateTime;
+END //
+
+CREATE PROCEDURE GetActiveShipmentsByStore(IN sid INT)
+BEGIN
+    SELECT
+        ShipmentID AS id,
+        route.RouteID AS routeID,
+        FilledCapacity AS capacityFilled,
+        Capacity AS fullCapacity,
+        CreatedDate AS createdDate,
+        Status AS status
+    FROM
+        shipment
+            JOIN
+        route ON shipment.RouteID = route.RouteID
+    WHERE
+        StoreID = sid
+      AND Status != 'Completed'
+    ORDER BY
+        CreatedDate;
+END //
+
+CREATE PROCEDURE GetInStoreOrdersByStore(IN sid INT)
+BEGIN
+    SELECT
+        OrderID AS OrderID,
+        DATE_FORMAT(OrderDate, '%Y-%m-%d') AS OrderDate,
+        Value AS Value,
+        TotalVolume AS TotalVolume,
+        StoreCity AS StoreCity,
+        RouteID AS RouteID
+    FROM
+        order_details_with_latest_status
+    WHERE
+        LatestStatus = 'InStore'
+      AND StoreID = sid;
+END //
+
+CREATE PROCEDURE GetOrdersInTrainByStore(IN sid INT)
+BEGIN
+    SELECT
+        tc.OrderID AS OrderID,
+        ts.TrainScheduleID AS TrainScheduleID,
+        ts.StoreCity AS Destination,
+        DATE_FORMAT(ts.ScheduleDateTime, '%e-%b-%y %T') AS TrainTime
+    FROM
+        (SELECT *
+         FROM order_details_with_latest_status
+         WHERE LatestStatus = 'InTrain'
+           AND StoreID = sid) AS trainAssigned
+            JOIN train_contains tc ON trainAssigned.OrderID = tc.OrderID
+            JOIN train_schedule_with_destinations ts ON tc.TrainScheduleID = ts.TrainScheduleID;
+END //
+
+CREATE PROCEDURE GetOrdersByStatusAndStore(IN sid INT, IN status VARCHAR(20))
+BEGIN
+    IF status = 'InStore' THEN
+        SELECT OrderID, StoreID, StoreCity, RouteID
+        FROM order_details_with_latest_status
+        WHERE StoreID = sid AND LatestStatus = 'InStore';
+
+    ELSEIF status = 'InShipment' THEN
+        SELECT OrderID, StoreID, ShipmentID, ShipmentStatus
+        FROM order_details_with_latest_status
+        WHERE StoreID = sid AND LatestStatus = 'InShipment';
+
+    ELSEIF status = 'InTruck' THEN
+        SELECT OrderID, StoreID, TruckID, AssistantID, DriverID
+        FROM order_details_with_latest_status
+        WHERE StoreID = sid AND LatestStatus = 'InTruck';
+    ELSE
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid status provided';
+    END IF;
+END //
+
+CREATE PROCEDURE GetDriversByStore(IN sid INT)
+BEGIN
+    SELECT
+        DriverID AS 'Driver ID',
+        Name AS 'Driver Name',
+        Contact AS 'Phone',
+        Status AS 'Availability',
+        CompletedHours AS 'CompletedHours',
+        WorkingHours AS 'WorkHours'
+    FROM
+        driver_details_with_employee
+    WHERE
+        StoreID = sid;
+END //
+
+CREATE PROCEDURE GetAssistantsByStore(IN sid INT)
+BEGIN
+    SELECT
+        AssistantID AS 'Assistant ID',
+        Name AS 'Assistant Name',
+        StoreID AS 'Store ID',
+        Contact AS 'Phone',
+        Status AS 'Availability',
+        CompletedHours AS 'CompletedHours',
+        WorkingHours AS 'WorkHours'
+    FROM
+        assistant_details_with_employee
+    WHERE
+        StoreID = sid;
+END //
+
+
 
 DELIMITER ;
