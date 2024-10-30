@@ -203,7 +203,10 @@ cron.schedule('* * * * *', async () => {
                 shipmentDriver.DriverID,
                 shipmentAssistant.AssistantID,
                 shipment.ShipmentID,
-                new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),  // ScheduleDateTime in UTC
+                new Date(Date.now() + 12 * 60 * 60 * 1000)
+                    .toISOString()
+                    .slice(0, 19)
+                    .replace('T', ' '),  // ScheduleDateTime in UTC
                 shipment.StoreID,
                 secondsToTime(routeDuration),  // Hours in HH:MM:SS format
                 RouteID
