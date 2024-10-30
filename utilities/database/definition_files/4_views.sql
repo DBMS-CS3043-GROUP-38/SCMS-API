@@ -230,5 +230,12 @@ WHERE ts.Status = 'Completed'
 GROUP BY ts.TruckID;
 //
 
+-- Shakthi - View for Driver and Assistant login
+create view login_info_view as select e.Type, e.EmployeeID, e.Name, e.Username, e.PasswordHash, a.AssistantID, d.DriverID 
+from Employee as e 
+left join Assistant as a on e.EmployeeID = a.EmployeeID 
+left join Driver as d on e.EmployeeID = d.EmployeeID where e.Type = ('Driver') or e.Type = ('Assistant') ;
+
+//
 
 DELIMITER ;

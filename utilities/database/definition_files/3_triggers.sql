@@ -175,6 +175,92 @@ begin
     where ShipmentID = OLD.ShipmentID;
 end;
 //
+-- Shakthi - Triggers for the driver app
+
+CREATE TRIGGER update_completed_hours_and_availability
+AFTER UPDATE ON TruckSchedule
+FOR EACH ROW
+BEGIN
+  -- Check if the status has changed to 'Completed'
+  IF NEW.Status = 'Completed' AND OLD.Status <> 'Completed' THEN
+    
+    -- Update CompletedHours for the Driver
+    UPDATE Driver
+    SET CompletedHours = ADDTIME(CompletedHours, NEW.Hours),
+    Status = "Available"
+    WHERE DriverID = NEW.DriverID;
+    
+    -- Update CompletedHours for the Assistant
+    UPDATE Assistant
+    SET CompletedHours = ADDTIME(CompletedHours, NEW.Hours),
+    Status = "Available"
+    WHERE AssistantID = NEW.AssistantID;
+  
+  END IF;
+END
+
+//
+
+CREATE TRIGGER insert_in_truck_orders
+AFTER UPDATE ON TruckSchedule
+FOR EACH ROW
+BEGIN
+  -- Check if the status has changed to 'In Progress'
+  IF NEW.Status = 'In Progress' AND OLD.Status <> 'In Progress' THEN
+
+    -- Insert new entries in Order_tracking for each order in Shipment_contains
+    INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
+    SELECT s.OrderID, NOW(), 'InTruck'
+    FROM Shipment_contains AS s
+    WHERE s.ShipmentID = NEW.ShipmentID;
+
+  END IF;
+END
+
+//
+
+CREATE TRIGGER revert_in_truck_orders
+AFTER UPDATE ON TruckSchedule
+FOR EACH ROW
+BEGIN
+  -- Check if the status has changed to 'Not Completed'
+  IF NEW.Status = 'Not Completed' AND OLD.Status = 'In Progress' THEN
+
+    -- Delete new entries in Order_tracking for each order in Shipment_contains
+    DELETE FROM Order_tracking
+    WHERE OrderID IN (
+      SELECT OrderID 
+      FROM Shipment_contains 
+      WHERE ShipmentID = NEW.ShipmentID
+    ) 
+    AND Status = 'InTruck';
+
+  END IF;
+END //
+
+CREATE TRIGGER check_and_put_back_undelivered_orders_and_mark_shipment_complete
+AFTER UPDATE ON TruckSchedule
+FOR EACH ROW
+BEGIN
+  -- Check if the status has changed to 'In Progress'
+  IF NEW.Status = 'Completed' AND OLD.Status = 'In Progress' THEN
+	UPDATE Shipment AS sh
+    SET Status = "Completed" 
+    WHERE sh.ShipmentID = NEW.ShipmentID;
+
+    -- Insert new entries in Order_tracking for each order in Shipment_contains
+    INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
+    SELECT s.OrderID, NOW(), 'InStore'
+    FROM Shipment_contains AS s
+    WHERE s.ShipmentID = NEW.ShipmentID
+    AND NOT EXISTS (
+        SELECT 1 
+        FROM Order_tracking AS ot 
+        WHERE ot.OrderID = s.OrderID AND ot.Status = 'Delivered'
+      );
+
+  END IF;
+END //
 
 
 DELIMITER ;
