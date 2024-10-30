@@ -4,6 +4,7 @@ import dashboardRoutes from './routes/dashboard/dashboard.mjs';
 import customerRoutes from './routes/users/customer/customerRoutes.mjs';
 import cors from 'cors';
 import driverRoute from './routes/users/driver/driverRoutes.mjs';
+import assistantRoute from './routes/users/assistants/assistantRoutes.mjs';
 dotenv.config();
  
 const app = express();
@@ -17,6 +18,7 @@ app.use(cors(
 // Routes
 app.use('/dashboard', dashboardRoutes);
 app.use('/driver', driverRoute);
+app.use('/assistant', assistantRoute);
 
  
 //Routes in customer UI
