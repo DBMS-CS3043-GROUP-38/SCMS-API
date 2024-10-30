@@ -1,6 +1,6 @@
 DELIMITER //
 
-
+# For dashboards
 create view Driver_Details_With_Employee as
 select d.DriverID,
        d.EmployeeID,
