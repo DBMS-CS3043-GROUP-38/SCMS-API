@@ -1,35 +1,41 @@
 import pool from '../database/db.mjs';
-import {faker} from "@faker-js/faker";
 
 
-
-async function createProduct(data) {
-    const {name, trainCapacityConsumption, type, price} = data;
-    try {
-        const query = `INSERT INTO Product (Name, TrainCapacityConsumption, Price, Type) VALUES (?, ?, ?, ?)`;
-        await pool.query(query, [name, trainCapacityConsumption, price, type]);
-        console.log(`Product ${name} created successfully: type - ${type}`);
-    } catch (error) {
-        console.log(error);
-    }
-}
-
-async function productCreation(categories) {
+async function productCreation(products) {
     let createdProducts = 0;
 
-    for (const category of categories) {
-        const numberOfProducts = Math.floor(Math.random() * 25) + 10;
-        for (let i = 0; i < numberOfProducts; i++) {
-            const name = faker.commerce.productName();
-            //
-            const trainCapacityConsumption = (Math.random() * 10).toFixed(2);
-            //Random price decimal (10,2) between 5 and 105
-            const price = (Math.random() * 100 + 5).toFixed(2);
-            await createProduct({name, trainCapacityConsumption, type: category, price});
+    for (let i = 0; i < products.length; i++) {
+        const product = products[i];
+        const { Name, TrainCapacityConsumption, Price, Type } = product;
+        const query = `INSERT INTO product (Name, TrainCapacityConsumption, Price, Type) VALUE (?, ?, ?, ?)`;
+        const values = [Name, TrainCapacityConsumption, Price, Type];
+        try {
+            const result = await pool.query(query, values);
             createdProducts++;
+        } catch (error) {
+            console.log(error);
         }
     }
     return createdProducts;
 }
 
 export default productCreation;
+
+
+
+    // {
+    //     "ProductID": 1,
+    //     "Name": "Classic Denim Jeans",
+    //     "TrainCapacityConsumption": 3.45,
+    //     "Price": 55.20,
+    //     "Type": "Clothes"
+    // },
+    // {
+    //     "ProductID": 2,
+    //     "Name": "Silk Blouse",
+    //     "TrainCapacityConsumption": 2.98,
+    //     "Price": 89.99,
+    //     "Type": "Clothes"
+    // },
+
+
