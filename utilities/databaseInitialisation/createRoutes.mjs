@@ -8,40 +8,51 @@ function getRandomInt(min, max) {
 
 // Function to generate a random time duration in HH:MM:SS format
 function getRandomDuration() {
-    const hours = getRandomInt(2, 10);     // Random hours between 0 and 10
+    const hours = getRandomInt(2, 5);     // Random hours between 0 and 10
     const minutes = getRandomInt(0, 59);   // Random minutes between 0 and 59
     const seconds = getRandomInt(0, 59);   // Random seconds between 0 and 59
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 // Function to create a random route for each store
-async function createRoutesForStores(numStores) {
+async function createRoutesForStores(routes) {
     let routesCreated = 0;
-    try {
-        for (let storeID = 1; storeID <= numStores; storeID++) {
-            const numRoutes = getRandomInt(3, 5); // Random number of routes per store (between 3 and 10)
 
-            for (let i = 0; i < numRoutes; i++) {
-                const timeDuration = getRandomDuration();
-                const description = faker.lorem.sentence();
+    for (const route of routes) {
+        const timeDuration = getRandomDuration()
+        const description = route.Description;
+        const storeID = route.StoreID;
+        const distance = route.Distance;
 
-                //Random distance decimal(6,2) between 20 and 100
-                const distance = (Math.random() * 80 + 20).toFixed(2);
+        const query = 'INSERT INTO Route ( Time_duration, Description, StoreID, Distance) VALUES ( ?, ?, ?, ?)';
+        const values = [ timeDuration, description, storeID, distance];
 
-
-                await pool.query(
-                    `INSERT INTO Route (Time_duration, Description, StoreID, Distance) VALUES (?, ?, ?, ?)`,
-                    [timeDuration, description, storeID, distance]
-                );
-
-                console.log(`Route created for StoreID ${storeID} with duration ${timeDuration} and description: ${description}`);
-                routesCreated++;
-            }
+        try {
+            await pool.query(query, values);
+            routesCreated++;
+        } catch (error) {
+            console.error(error);
         }
-    } catch (error) {
-        console.error('Error creating routes:', error);
     }
+
     return routesCreated;
 }
 
 export default createRoutesForStores;
+
+
+// [
+//     {
+//         "RouteID": 1,
+//         "Time_duration": "06:57:07",
+//         "Description": "Kurunegala to Anamaduwa via A10 ",
+//         "StoreID": 1,
+//         "Distance": 68.96
+//     },
+//     {
+//         "RouteID": 2,
+//         "Time_duration": "08:36:49",
+//         "Description": "Kurunegala to Polgahawela via A3",
+//         "StoreID": 1,
+//         "Distance": 55.92
+//     },

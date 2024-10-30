@@ -540,6 +540,155 @@ const products = [
         "Type": "Others"
     }
 ]
+const routes = [
+    {
+        "RouteID": 1,
+        "Time_duration": "06:57:07",
+        "Description": "Kurunegala to Anamaduwa via A10 ",
+        "StoreID": 1,
+        "Distance": 68.96
+    },
+    {
+        "RouteID": 2,
+        "Time_duration": "08:36:49",
+        "Description": "Kurunegala to Polgahawela via A3",
+        "StoreID": 1,
+        "Distance": 55.92
+    },
+    {
+        "RouteID": 3,
+        "Time_duration": "02:27:23",
+        "Description": "Kurunegala to Badagamuwa via A6.",
+        "StoreID": 1,
+        "Distance": 26.00
+    },
+    {
+        "RouteID": 4,
+        "Time_duration": "10:13:16",
+        "Description": "Kurunegala to Mallawapitiya via B3.",
+        "StoreID": 1,
+        "Distance": 67.86
+    },
+    {
+        "RouteID": 5,
+        "Time_duration": "02:56:08",
+        "Description": "Kurunegala to Pothuhara via Tower junction.",
+        "StoreID": 1,
+        "Distance": 21.73
+    },
+    {
+        "RouteID": 6,
+        "Time_duration": "02:17:37",
+        "Description": "Colombo to Negombo via Katunayaka.",
+        "StoreID": 2,
+        "Distance": 32.44
+    },
+    {
+        "RouteID": 7,
+        "Time_duration": "07:08:10",
+        "Description": "Colombo to Kaluthara via A10 road .",
+        "StoreID": 2,
+        "Distance": 23.63
+    },
+    {
+        "RouteID": 8,
+        "Time_duration": "04:22:20",
+        "Description": "Colombo to Rathnapura via B5 road .",
+        "StoreID": 2,
+        "Distance": 76.91
+    },
+    {
+        "RouteID": 9,
+        "Time_duration": "02:02:29",
+        "Description": "Galle to Koggala via  sea railway junction.",
+        "StoreID": 3,
+        "Distance": 29.46
+    },
+    {
+        "RouteID": 10,
+        "Time_duration": "05:59:58",
+        "Description": "Galle to Rathgama via  B19 road.",
+        "StoreID": 3,
+        "Distance": 50.99
+    },
+    {
+        "RouteID": 11,
+        "Time_duration": "09:35:12",
+        "Description": "Galle to Baddegama via  B132 road.",
+        "StoreID": 3,
+        "Distance": 85.69
+    },
+    {
+        "RouteID": 12,
+        "Time_duration": "03:10:28",
+        "Description": "Galle to Matara via  A2 road.",
+        "StoreID": 3,
+        "Distance": 73.68
+    },
+    {
+        "RouteID": 13,
+        "Time_duration": "05:46:12",
+        "Description": "Jaffna to kaytes via AB19 road.",
+        "StoreID": 4,
+        "Distance": 91.89
+    },
+    {
+        "RouteID": 14,
+        "Time_duration": "10:44:56",
+        "Description": "Jaffna to Dabakolapatuna via AB17 road.",
+        "StoreID": 4,
+        "Distance": 84.09
+    },
+    {
+        "RouteID": 15,
+        "Time_duration": "10:18:39",
+        "Description": "Jaffna to Kodikkamam via A9 road.",
+        "StoreID": 4,
+        "Distance": 55.87
+    },
+    {
+        "RouteID": 16,
+        "Time_duration": "10:42:46",
+        "Description": "Jaffna to Kodikkamam via A9 road.",
+        "StoreID": 4,
+        "Distance": 54.64
+    },
+    {
+        "RouteID": 17,
+        "Time_duration": "06:09:40",
+        "Description": "Batticaloa to Polonnaruwa via A11.",
+        "StoreID": 5,
+        "Distance": 52.84
+    },
+    {
+        "RouteID": 18,
+        "Time_duration": "04:45:33",
+        "Description": "Batticaloa to Kenniya via A15.",
+        "StoreID": 5,
+        "Distance": 57.11
+    },
+    {
+        "RouteID": 19,
+        "Time_duration": "07:31:13",
+        "Description": "Batticaloa to Trincomalee via A15.",
+        "StoreID": 5,
+        "Distance": 66.50
+    },
+    {
+        "RouteID": 20,
+        "Time_duration": "03:18:04",
+        "Description": "Batticaloa to Ampara via A27.",
+        "StoreID": 5,
+        "Distance": 54.34
+    },
+    {
+        "RouteID": 21,
+        "Time_duration": "10:15:37",
+        "Description": "Batticaloa to Akkareipattu via A4.",
+        "StoreID": 5,
+        "Distance": 68.86
+    }
+]
 
 const databaseInitialisation = async () => {
     await storeCreation(storeCities);
@@ -548,7 +697,7 @@ const databaseInitialisation = async () => {
     await statusCreation(orderStatuses);
     await trainCreation(100, storeCities.length);
     await truckCreation(storeCities.length);
-    const routesCreated = await createRoutesForStores(storeCities.length);
+    const routesCreated = await createRoutesForStores(routes);
     await createOrders(nuOfProducts, orderStatuses, routesCreated, customerCount);
     // await createShipment();
     // await truckSchedule();
