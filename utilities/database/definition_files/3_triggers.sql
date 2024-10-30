@@ -187,13 +187,13 @@ BEGIN
     -- Update CompletedHours for the Driver
     UPDATE Driver
     SET CompletedHours = ADDTIME(CompletedHours, NEW.Hours),
-    Status = "Available"
+    Status = 'Available'
     WHERE DriverID = NEW.DriverID;
     
     -- Update CompletedHours for the Assistant
     UPDATE Assistant
     SET CompletedHours = ADDTIME(CompletedHours, NEW.Hours),
-    Status = "Available"
+    Status = 'Available'
     WHERE AssistantID = NEW.AssistantID;
   
   END IF;
@@ -245,7 +245,7 @@ BEGIN
   -- Check if the status has changed to 'In Progress'
   IF NEW.Status = 'Completed' AND OLD.Status = 'In Progress' THEN
 	UPDATE Shipment AS sh
-    SET Status = "Completed" 
+    SET Status = 'Completed'
     WHERE sh.ShipmentID = NEW.ShipmentID;  
 
     -- Insert new entries in Order_tracking for each order in Shipment_contains
