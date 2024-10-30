@@ -777,3 +777,59 @@ END //
 
 
 DELIMITER ;
+
+
+DELIMITER $$
+
+CREATE TRIGGER assistant_is_available
+AFTER UPDATE ON TruckSchedule
+FOR EACH ROW
+BEGIN
+    IF NEW.Status = 'Completed' AND OLD.Status = 'In Progress' THEN
+        UPDATE Assistant
+        SET Status = 'Available'
+        WHERE AssistantID = NEW.AssistantID AND Status = 'Busy';
+    END IF;
+END$$
+
+DELIMITER;
+
+DELIMITER $$
+
+CREATE TRIGGER driver_is_available
+AFTER UPDATE ON TruckSchedule
+FOR EACH ROW
+BEGIN
+    IF NEW.Status = 'Completed' AND OLD.Status = 'In Progress' THEN
+        UPDATE Driver
+        SET Status = 'Available'
+        WHERE DriverID = NEW.DriverID AND Status = 'Busy';
+    END IF;
+END$$
+
+DELIMITER;
+
+create view login_info_view as
+select e.Type, e.EmployeeID, e.Name, e.Username, e.PasswordHash, a.AssistantID, d.DriverID
+from
+    Employee as e
+    left join Assistant as a on e.EmployeeID = a.EmployeeID
+    left join Driver as d on e.EmployeeID = d.EmployeeID
+where
+    e.Type = ('Driver')
+    or e.Type = ('Assistant');
+
+CREATE VIEW OrderDetailsByShipment AS
+SELECT
+    OrderID,
+    CustomerName,
+    c.Username AS CustomerUsername,
+    c.Contact AS CustomerContact,
+    CustomerType,
+    c.Address AS CustomerAddress,
+    TruckScheduleID
+FROM
+    order_details_with_latest_status o
+    LEFT JOIN customer c ON o.CustomerID = c.CustomerID;
+
+
