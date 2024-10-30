@@ -10,100 +10,31 @@ router.get('/test', (req, res) => {
 
 router.get('/revenue-past', async (req, res) => {
     try {
-        const query = `
-            SELECT
-                CONCAT(YEAR(OrderDate), '-Q', QUARTER(OrderDate)) as quarter,
-                SUM(Value) as TotalRevenue
-            FROM order_details_with_latest_status
-            WHERE LatestStatus NOT LIKE 'Cancelled'
-            GROUP BY quarter
-            ORDER BY quarter DESC;
-        `;
+        const StoreID = req.user.StoreID;
+        const query = 'CALL GetPastRevenueByStore(?)';
 
-        const [rows] = await pool.query(query);
-        res.json(rows);
+        const [rows] = await pool.query(query, [StoreID]);
+        res.json(rows[0]); // Access the first element of rows since stored procedures return results as an array
     } catch (e) {
         console.error(e);
         res.status(500).json({error: 'Failed to fetch revenue data'});
     }
 });
 
+
 router.get('/order-statuses', async (req, res) => {
     try {
         const StoreID = req.user.StoreID;
-        const query = `
-            select count(*) as count, LatestStatus as status
-            from order_details_with_latest_status where StoreID = ${StoreID}
-            group by LatestStatus;
-        `;
-        const [rows] = await pool.query(query);
-        // const orderStatuses = rows.reduce((acc, row) => {
-        //     acc[row.Status] = row.Count;
-        //     return acc;
-        // }, {});
-        console.log(`Fetched order statuses: ${JSON.stringify(rows)}`);
-        res.json(rows);
+        const query = 'CALL GetOrderStatusesByStore(?)';
+
+        const [rows] = await pool.query(query, [StoreID]);
+        console.log(`Fetched order statuses: ${JSON.stringify(rows[0])}`);
+        res.json(rows[0]); // Access the first element of rows since stored procedures return results as an array
     } catch (e) {
+        console.error(e); // Log the error for debugging
         res.status(500).json({error: 'Failed to fetch order statuses'});
     }
 });
 
-router.get('/revenue-past-month', async (req, res) => {
-    try {
-        const query = `
-            select DATE_FORMAT(OrderDate, '%d %M') as day, SUM(Value) as revenue
-            from order_details_with_latest_status
-            where LatestStatus NOT LIKE 'Cancelled'
-            group by (OrderDate)
-            order by OrderDate desc
-            limit 30;
-        `;
-        const [rows] = await pool.query(query);
-        console.log(`Fetched monthly revenue data: ${rows.length} rows`);
-        res.json(rows);
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({error: 'Failed to fetch monthly revenue data'});
-    }
-});
-
-router.get('/revenue-per-store/:year/:quarter', async (req, res) => {
-    const {year, quarter} = req.params;
-    try {
-        const query = `
-            select StoreCity as store, TotalRevenue as revenue
-            from quarterly_store_report
-            where Year = ? and Quarter = ?
-            order by revenue desc;
-        `;
-        const [rows] = await pool.query(query, [year, quarter]);
-        console.log(`Fetched revenue per store data: ${rows.length} rows`);
-        res.json(rows);
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({error: 'Failed to fetch revenue per store data'});
-    }
-});
-
-router.get('/customer-distribution', async (req, res) => {
-    try {
-        const customers = {"End": 0, "Retailer": 0}
-        const query = `
-            select Type, count(CustomerID) as count
-            from customer
-            group by Type;
-        `
-
-        const [rows] = await pool.query(query);
-        rows.forEach(row => {
-            customers[row.Type] = row.count;
-        });
-        console.log(`Fetched customer distribution: ${JSON.stringify(customers)}`);
-        res.json(customers);
-    } catch (e) {
-        console.log(e);
-        res.status(500).json({error: 'Failed to fetch customer distribution'});
-    }
-});
 
 export default router;
