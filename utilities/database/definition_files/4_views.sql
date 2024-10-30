@@ -244,5 +244,44 @@ FROM
     Customer;
 //
 
+# Chehan's
+CREATE OR REPLACE VIEW RouteStore AS
+SELECT s.ShipmentID, r.StoreID
+FROM shipment s
+         JOIN route r ON s.RouteID = r.RouteID;
+//
+
+CREATE OR REPLACE VIEW AvailableDrivers AS
+SELECT d.DriverID, d.CompletedHours, e.StoreID
+FROM driver d
+         JOIN employee e ON d.EmployeeID = e.EmployeeID
+WHERE d.Status = 'Available' AND CompletedHours <= 40
+ORDER BY d.CompletedHours ASC
+;
+//
+
+CREATE OR REPLACE VIEW AvailableAssistants AS
+SELECT a.AssistantID, a.CompletedHours, e.StoreID
+FROM assistant a
+         JOIN employee e ON a.EmployeeID = e.EmployeeID
+WHERE a.Status = 'Available' AND CompletedHours <= 60
+ORDER BY a.CompletedHours ASC
+;
+//
+
+CREATE OR REPLACE VIEW TruckScheduleDetails AS
+SELECT
+    TruckScheduleID,
+    TruckID,
+    DriverID,
+    AssistantID,
+    ScheduleDateTime AS StartTime,
+    DATE_ADD(ScheduleDateTime, INTERVAL TIME_TO_SEC(Hours) SECOND) AS EndTime
+FROM
+    TruckSchedule
+ORDER BY
+    EndTime DESC;
+//
+
 
 DELIMITER ;
