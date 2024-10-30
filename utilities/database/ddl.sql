@@ -614,6 +614,43 @@ ORDER BY SaleDate DESC, TotalRevenue DESC
 ;
 //
 
+CREATE OR REPLACE VIEW RouteStore AS
+SELECT s.ShipmentID, r.StoreID
+FROM shipment s
+JOIN route r ON s.RouteID = r.RouteID;
+//
+
+CREATE OR REPLACE VIEW AvailableDrivers AS
+SELECT d.DriverID, d.CompletedHours, e.StoreID
+FROM driver d
+JOIN employee e ON d.EmployeeID = e.EmployeeID
+WHERE d.Status = 'Available' AND CompletedHours <= 40
+ORDER BY d.CompletedHours ASC
+;
+//
+
+CREATE OR REPLACE VIEW AvailableAssistants AS
+SELECT a.AssistantID, a.CompletedHours, e.StoreID
+FROM assistant a
+JOIN employee e ON a.EmployeeID = e.EmployeeID
+WHERE a.Status = 'Available' AND CompletedHours <= 60
+ORDER BY a.CompletedHours ASC
+;
+//
+
+CREATE OR REPLACE VIEW TruckScheduleDetails AS
+SELECT 
+    TruckScheduleID,
+    TruckID,
+    DriverID,
+    AssistantID,
+    ScheduleDateTime AS StartTime,
+    DATE_ADD(ScheduleDateTime, INTERVAL Hours HOUR) AS EndTime
+FROM 
+    truckschedule
+ORDER BY 
+    ScheduleDateTime DESC;
+//
 
 CREATE VIEW Truck_Distances AS
 SELECT ts.TruckID,
@@ -760,6 +797,26 @@ BEGIN
 END//
 
 
+-- Creates the event to reset the CompletedHours weekly
+
+CREATE EVENT ResetCompletedHours
+ON SCHEDULE
+    EVERY 1 WEEK
+    STARTS '2024-10-27 00:00:00' -- Set to a Monday
+DO
+BEGIN
+    -- Reset CompletedHours for drivers
+    UPDATE driver
+    SET CompletedHours = 0;
+
+    -- Reset CompletedHours for assistants
+    UPDATE assistant
+    SET CompletedHours = 0;
+END;
+//
+
+DELIMITER ;
+
 
 # -------------procedure  create for profile page--------------
 
@@ -789,3 +846,4 @@ FROM
 
 
 DELIMITER ;
+
