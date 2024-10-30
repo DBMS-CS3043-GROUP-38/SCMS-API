@@ -639,17 +639,17 @@ ORDER BY a.CompletedHours ASC
 //
 
 CREATE OR REPLACE VIEW TruckScheduleDetails AS
-SELECT 
+SELECT
     TruckScheduleID,
     TruckID,
     DriverID,
     AssistantID,
     ScheduleDateTime AS StartTime,
-    DATE_ADD(ScheduleDateTime, INTERVAL Hours HOUR) AS EndTime
-FROM 
-    truckschedule
-ORDER BY 
-    ScheduleDateTime DESC;
+    DATE_ADD(ScheduleDateTime, INTERVAL TIME_TO_SEC(Hours) SECOND) AS EndTime
+FROM
+    TruckSchedule
+ORDER BY
+    EndTime DESC;
 //
 
 CREATE VIEW Truck_Distances AS

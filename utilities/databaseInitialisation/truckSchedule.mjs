@@ -33,7 +33,7 @@ async function addTruckSchedule() {
             const time = route[0].Time_duration;
 
             await pool.query(`
-            insert into truckschedule(StoreID, ShipmentID, ScheduleDateTime, RouteID, AssistantID, DriverID, TruckID, Hours, Status) VALUE (?, ?, CURDATE(), ?, ?, ?, ?, ?, ?)
+            insert into truckschedule(StoreID, ShipmentID, ScheduleDateTime, RouteID, AssistantID, DriverID, TruckID, Hours, Status) VALUE (?, ?, DATE_SUB(CURDATE(), INTERVAL 60 DAY) , ?, ?, ?, ?, ?, ?)                                                                                                        
             `, [StoreID, ShipmentID, RouteID, randomAssistant.AssistantID, randomDriver.DriverID, randomTruck.TruckID, time, 'Completed']);
             console.log(`Shipment ${ShipmentID} added to truck schedule`);
         }

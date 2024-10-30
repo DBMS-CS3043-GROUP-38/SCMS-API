@@ -23,12 +23,24 @@ connection.connect((err) => {
 });
 
 // Utility function to check if a date is at least 7 days old
-function isOlderThan7Days(date) {
+function isOlderThan7Days(dateString) {
+    const date = new Date(dateString);
     const now = new Date();
-    const shipmentDate = new Date(date);
-    const diffTime = Math.abs(now - shipmentDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays >= 7;
+    const daysDifference = (now - date) / (1000 * 60 * 60 * 24);
+    return daysDifference > 7;
+}
+
+function timeToSeconds(timeStr) {
+    const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+    return hours * 3600 + minutes * 60 + seconds;
+}
+
+// Function to convert seconds to HH:MM:SS format
+function secondsToTime(seconds) {
+    const hrs = Math.floor(seconds / 3600).toString().padStart(2, '0');
+    const mins = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+    const secs = (seconds % 60).toString().padStart(2, '0');
+    return `${hrs}:${mins}:${secs}`;
 }
 
 // Cron job to run every minute
@@ -36,15 +48,18 @@ cron.schedule('* * * * *', async () => {
     console.log('Running truck scheduling task');
 
     try {
-        // Update 'notReady' shipments to 'ready'
+        // Start a transaction
+        await connection.promise().query('START TRANSACTION');
+
+        // Update 'NotReady' shipments to 'Ready'
         const [shipments] = await connection.promise().query(`
-            SELECT ShipmentID, CreateDate, FilledCapacity, Capacity
+            SELECT ShipmentID, CreatedDate, FilledCapacity, Capacity, RouteID
             FROM shipment
             WHERE Status = 'NotReady'
         `);
 
         for (let shipment of shipments) {
-            if (shipment.FilledCapacity >= 0.8 * shipment.Capacity || isOlderThan7Days(shipment.CreateDate)) {
+            if ((parseFloat(shipment.FilledCapacity) >= 0.001 * parseFloat(shipment.Capacity) || isOlderThan7Days(shipment.CreatedDate))) {
                 await connection.promise().query(`
                     UPDATE shipment
                     SET Status = 'Ready'
@@ -53,16 +68,25 @@ cron.schedule('* * * * *', async () => {
             }
         }
 
-        // Step 2: Assign 'ready' shipments to trucks
-        
+        // Step 2: Assign 'Ready' shipments to trucks
         const [readyShipments] = await connection.promise().query(`
-            SELECT s.ShipmentID, r.StoreID
+            SELECT s.ShipmentID, r.StoreID, s.RouteID
             FROM shipment s
-            JOIN RouteStore r ON s.ShipmentID = r.ShipmentID
+                     JOIN RouteStore r ON s.ShipmentID = r.ShipmentID
             WHERE s.Status = 'Ready'
         `);
 
+        let RouteID = null;
+        let shipmentDriver = null;
+        let shipmentAssistant = null;
+        let truckID = null;
+
         for (let shipment of readyShipments) {
+            RouteID = null;
+            shipmentDriver = null;
+            shipmentAssistant = null;
+            truckID = null;
+
             // Assign available truck at the StoreID
             const [trucks] = await connection.promise().query(`
                 SELECT TruckID
@@ -71,8 +95,83 @@ cron.schedule('* * * * *', async () => {
                 LIMIT 1
             `, [shipment.StoreID]);
 
-            if (trucks.length === 0) {
-                console.log(`No available trucks at store ${shipment.StoreID}`);
+            const [assistants] = await connection.promise().query(`
+                SELECT AssistantID, CompletedHours
+                FROM AvailableAssistants
+                WHERE StoreID = ?
+            `, [shipment.StoreID]);
+
+            const [drivers] = await connection.promise().query(`
+                SELECT DriverID, CompletedHours
+                FROM AvailableDrivers 
+                WHERE StoreID = ?
+            `, [shipment.StoreID]);
+
+            if (trucks.length === 0 || assistants.length === 0 || drivers.length === 0 || trucks.length === 0) {
+                console.log(`No available truck, driver or assistant found for shipment ${shipment.ShipmentID}.`);
+                continue;
+            }
+
+            RouteID = shipment.RouteID;
+            truckID = trucks[0].TruckID;
+
+            // Fetch the route duration
+            const [route] = await connection.promise().query(`
+                SELECT Time_duration
+                FROM route
+                WHERE RouteID = ?
+            `, [RouteID]);
+
+            const routeDuration = timeToSeconds(route[0].Time_duration);
+
+            // Step 3: Assign driver and assistant according to roster rules
+            for (let driver of drivers) {
+                const [lastSchedule] = await connection.promise().query(`
+                    SELECT EndTime
+                    FROM TruckScheduleDetails
+                    WHERE DriverID = ?
+                    ORDER BY EndTime DESC
+                    LIMIT 1
+                `, [driver.DriverID]);
+
+                const now = new Date();
+                const lastScheduleEndTime = lastSchedule.length ? new Date(lastSchedule[0].EndTime) : null;
+                const hoursDifference = lastScheduleEndTime ? (now - lastScheduleEndTime) / (1000 * 60 * 60) : Infinity;
+
+                if (hoursDifference >= 4 && timeToSeconds(driver.CompletedHours) + routeDuration <= 3600 * 40) {
+                    shipmentDriver = driver;
+                    break;
+                }
+            }
+
+            for (let assistant of assistants) {
+                const [lastEntries] = await connection.promise().query(`
+                    SELECT StartTime, EndTime
+                    FROM TruckScheduleDetails
+                    WHERE AssistantID = ?
+                    ORDER BY EndTime DESC
+                    LIMIT 2
+                `, [assistant.AssistantID]);
+
+                if (lastEntries.length < 2 && timeToSeconds(assistant.CompletedHours) + routeDuration <= 60 * 3600) {
+                    shipmentAssistant = assistant;
+                    break;
+                }
+
+                const now = new Date();
+                if (lastEntries.length === 2) {
+                    const timeGap = (new Date(lastEntries[0].StartTime) - new Date(lastEntries[1].EndTime)) / (1000 * 60 * 60);
+                    const timeGapTillCurrentTime = (now - new Date(lastEntries[0].EndTime)) / (1000 * 60 * 60);
+                    if (timeGap >= 3 && timeToSeconds(assistant.CompletedHours) + routeDuration <= 60 * 3600 && timeGapTillCurrentTime >= 3) {
+                        shipmentAssistant = assistant;
+                        break;
+                    }
+                }
+            }
+
+            if (!shipmentDriver || !shipmentAssistant || !truckID) {
+                console.log(`No available driver, assistant or truck found for shipment ${shipment.ShipmentID}.`);
+                console.log(`Driver: ${shipmentDriver}, Assistant: ${shipmentAssistant}, Truck: ${truckID}`);
                 continue;
             }
 
@@ -80,143 +179,46 @@ cron.schedule('* * * * *', async () => {
                 UPDATE truck
                 SET Status = 'Busy'
                 WHERE TruckID = ?
-            `, [trucks[0].TruckID]);
+            `, [truckID]);
 
-            // Fetches the time to complete the route
-            const [route] = await connection.promise().query(`
-                SELECT Time_duration
-                FROM route
-                WHERE RouteID = (SELECT RouteID FROM shipment WHERE ShipmentID = ?)
-            `, [shipment.ShipmentID]);
-
-            const routeDuration = route[0].Time_duration;
-
-            // Step 3: Assign driver and assistant according to roster rules
-
-            let shipmentDriver,shipmentAssistant;
-
-            const [drivers] = await connection.promise().query(`
-                SELECT DriverID, CompletedHours
-                FROM AvailableDrivers 
-                WHERE StoreID = ?
-            `,[shipment.StoreID]);
-
-            // const [assistants] = await connection.promise().query(`
-            //     SELECT AssistantID
-            //     FROM assistant
-            //     WHERE Status = 'Available' AND CompletedHours <= 60
-            //     AND (
-            //         SELECT COUNT(*)
-            //         FROM truckschedule ts
-            //         WHERE ts.AssistantID = assistant.AssistantID
-            //         ORDER BY ts.ScheduleDateTime DESC
-            //         LIMIT 2
-            //     ) < 2
-            // `);
-
-            if (drivers.length === 0 || assistants.length === 0) {
-                console.log(`No available driver or assistant for shipment ${shipment.ShipmentID}`);
-                continue;
-            }
-
-            for (let driver of drivers) {
-                // Get the last ScheduleDateTime for the driver
-                const [lastSchedule] = await connection.promise().query(`
-                    SELECT EndTime
-                    FROM TruckScheduleDetails
-                    WHERE DriverID = ?
-                    LIMIT 1
-                `, [driver.DriverID]);
-            
-                const lastScheduleEndTime = lastSchedule[0].LastScheduleTime;
-                const now = new Date();
-            
-                // Check if there’s a 4-hour resting period before the next assignment
-                const hoursDifference = lastScheduleEndTime ? 
-                                        (now - new Date(lastScheduleEndTime)) / (1000 * 60 * 60) : 
-                                        Infinity;
-            
-                if (hoursDifference >= 4 && driver.CompletedHours + routeDuration <= 40) {
-                    // Update driver status to 'Busy' and assign driver
-                    await connection.promise().query(`
-                        UPDATE driver
-                        SET Status = 'Busy'
-                        WHERE DriverID = ?
-                    `, [driver.DriverID]);
-            
-                    shipmentDriver = driver;
-                    break;
-                }
-            }
-
-            const [assistants] = await connection.promise().query(`
-                SELECT AssistantID, CompletedHours
-                FROM AvailableAssistants
-                WHERE StoreID = ?
-            `,[shipment.StoreID ]);
-
-            for(let assistant of assistants) {
-
-                const [LastEntriesOfAssistants] = await connection.promise().query(`
-                    SELECT StartTime, EndTime
-                    FROM TruckScheduleView
-                    WHERE AssistantID = ?
-                    LIMIT 2
-                `, [assistant.AssistantID]);
-
-                if (LastEntriesOfAssistants.length < 2 && assistant.CompletedHours + routeDuration <= 60) {
-                    await connection.promise().query(`
-                        UPDATE assistant
-                        SET Status = 'Busy'
-                        WHERE AssistantID = ?
-                    `, [routeDuration,assistant.AssistantID]);
-    
-                    shipmentAssistant = assistant;
-                    break;
-                }
-
-                const lastEntry = LastEntriesOfAssistants[0];
-                const previousEntry = LastEntriesOfAssistants[1];
-                const timeGap = (Date(lastEntry.StartTime) - Date(previousEntry.EndTime)) / (1000 * 60 * 60);
-
-                if (timeGap >= 3 && assistant.CompletedHours + routeDuration <= 60) {
-                    // Update the assistant's status to 'Busy'
-                    await connection.promise().query(`
-                        UPDATE assistant
-                        SET Status = 'Busy'
-                        WHERE AssistantID = ?
-                    `, [assistant.AssistantID]);
-
-                    shipmentAssistant = assistant;
-                    break;
-                }
-                
-            }
-
-            // Assign to the truck schedule
             await connection.promise().query(`
-                INSERT INTO truckschedule (TruckID, DriveID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours, Status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'Not Completed')
-            `, [TruckID, shipmentDriver.DriveID, shipmentAssistant.AssistantID, shipment.ShipmentID, Date(now.getTime() + 60 * 60 * 1000), shipment.StoreID, routeDuration]);
+                UPDATE driver
+                SET Status = 'Busy'
+                WHERE DriverID = ?
+            `, [shipmentDriver.DriverID]);
 
-            console.log(`Driver ${shipmentDriver.DriveID} and assistant ${shipmentAssistant.AssistantID} assigned to truck ${TruckID} to deliver the shipment ${shipment.ShipmentID}. `);
+            await connection.promise().query(`
+                UPDATE assistant
+                SET Status = 'Busy'
+                WHERE AssistantID = ?
+            `, [shipmentAssistant.AssistantID]);
 
-            // await connection.promise().query(`
-            //     UPDATE driver
-            //     SET completedHours = completedHours + ?
-            //     WHERE DriveID = ?
-            // `, [routeDuration, driver[0].DriveID]);
+            await connection.promise().query(`
+                INSERT INTO truckschedule (TruckID, DriverID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours, Status, RouteID)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'Not Completed', ?)
+            `, [
+                truckID,
+                shipmentDriver.DriverID,
+                shipmentAssistant.AssistantID,
+                shipment.ShipmentID,
+                new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),  // ScheduleDateTime in UTC
+                shipment.StoreID,
+                secondsToTime(routeDuration),  // Hours in HH:MM:SS format
+                RouteID
+            ]);
 
-            // await connection.promise().query(`      
-            //     UPDATE assistant
-            //     SET completedHours = completedHours + ?
-            //     WHERE AssistantID = ?
-            // `, [routeDuration, assistant[0].AssistantID]);
-
-            // console.log(`Updated work hours for driver ${driver[0].DriveID} and assistant ${assistant[0].AssistantID}`);
+            console.log(`Driver ${shipmentDriver.DriverID} and assistant ${shipmentAssistant.AssistantID} assigned to truck ${truckID} to deliver shipment ${shipment.ShipmentID}.`);
         }
+
+        // Commit the transaction
+        await connection.promise().query('COMMIT');
+
     } catch (error) {
-        console.error('Error executing truck scheduling task:', error);
+        // Rollback the transaction in case of error
+        await connection.promise().query('ROLLBACK');
+        console.error("Error executing truck scheduling task:", error);
+    } finally {
+        connection.end();
     }
 });
 

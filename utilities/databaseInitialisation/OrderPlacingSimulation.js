@@ -29,7 +29,7 @@ connection.connect((err) => {
 });
 
 // Schedule a task to run every minute
-cron.schedule('* * * * *', async () => {
+cron.schedule('* * * * * *', async () => {
     console.log('Running a task every minute');
 
     // Define your SQL query

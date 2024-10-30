@@ -244,13 +244,13 @@ END //
 CREATE PROCEDURE GetTrucksByStore(IN sid INT)
 BEGIN
     SELECT
-        td.TruckID AS 'Truck ID',
+        truck.TruckID AS 'Truck ID',
         LicencePlate AS 'Licence Plate',
-        TotalDistance AS 'Total Distance(KM)',
+        COALESCE(TotalDistance, 0) AS 'Total Distance(KM)',
         Status AS 'Availability'
     FROM
         truck
-            JOIN
+            left outer join
         truck_distances td ON truck.TruckID = td.TruckID
     WHERE
         StoreID = sid

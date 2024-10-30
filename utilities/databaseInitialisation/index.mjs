@@ -550,8 +550,8 @@ const databaseInitialisation = async () => {
     await truckCreation(storeCities.length);
     const routesCreated = await createRoutesForStores(storeCities.length);
     await createOrders(nuOfProducts, orderStatuses, routesCreated, customerCount);
-    await createShipment();
-    await truckSchedule();
+    // await createShipment();
+    // await truckSchedule();
 }
 
 //Run the function
