@@ -7,6 +7,27 @@ router.get('/test', (req, res) => {
     res.send('Admin dashboard route working');
 });
 
+
+router.get('/today-sales', async (req, res) => {
+    try {
+        const storeID = req.user.StoreID;
+        const query = 'CALL GetTodaySalesByStore(?)'; // Call the stored procedure
+
+        const [rows] = await pool.query(query, [storeID]);
+
+        const data = {
+            current: rows[0][0]?.TotalRevenue || 0,   // Use optional chaining and provide default
+            previous: rows[0][1]?.TotalRevenue || 0   // Use optional chaining and provide default
+        }
+
+        res.json(data);
+    } catch (e) {
+        console.error(e); // Log the error for debugging
+        res.status(500).json({ error: 'Failed to fetch today sales' });
+    }
+});
+
+
 router.get('/quarterly-sales', async (req, res) => {
     try {
         const storeID = req.user.StoreID; // Assuming you have a middleware to set req.user
@@ -57,6 +78,7 @@ router.get('/train-statuses', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch train statuses' });
     }
 });
+
 
 
 

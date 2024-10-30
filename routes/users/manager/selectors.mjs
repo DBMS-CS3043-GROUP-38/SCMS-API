@@ -16,10 +16,6 @@ router.get('/today-trains', async (req, res) => {
         const query = 'CALL GetTodayTrainsByStore(?)';
         const [rows] = await pool.query(query, [StoreID]);
 
-        // Check if any rows are returned
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No trains scheduled for today' });
-        }
 
         res.json(rows[0]);  // Return the first result set
     } catch (e) {

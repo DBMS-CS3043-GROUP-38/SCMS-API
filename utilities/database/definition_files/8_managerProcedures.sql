@@ -299,7 +299,7 @@ BEGIN
     WHERE ShipmentID = shid;
 END //
 
-CREATE PROCEDURE GetTruckSchedulesByStore(IN storeId INT)
+CREATE PROCEDURE GetTruckSchedulesByStore(IN sid INT)
 BEGIN
     SELECT
         TruckScheduleID AS 'Schedule ID',
@@ -316,8 +316,27 @@ BEGIN
     FROM
         truck_schedule_with_details
     WHERE
-        StoreID = storeId;
+        StoreID = sid;
 END //
+
+
+CREATE PROCEDURE GetTodaySalesByStore(IN sid INT)
+BEGIN
+    SELECT
+        DATE(OrderDate) AS Date,
+        SUM(Value) AS TotalRevenue
+    FROM
+        order_details_with_latest_status
+    WHERE
+        LatestStatus NOT LIKE 'Cancelled'
+      AND StoreID = sid
+    GROUP BY
+        DATE(OrderDate)
+    ORDER BY
+        Date DESC
+    LIMIT 2;
+END //
+
 
 
 DELIMITER ;

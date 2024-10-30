@@ -15,11 +15,6 @@ router.get('/trains-today', async (req, res) => {
         const query = 'CALL GetTrainsTodayByStore(?)';
         const [rows] = await pool.query(query, [StoreID]);
 
-        // Check if any rows are returned
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No trains scheduled for today' });
-        }
-
         res.json(rows[0]);  // Return the first result set
     } catch (error) {
         console.error(error);
@@ -34,11 +29,6 @@ router.get('/active-trains', async (req, res) => {
         // Call the stored procedure to fetch active trains
         const query = 'CALL GetActiveTrainsByStore(?)';
         const [rows] = await pool.query(query, [StoreID]);
-
-        // Check if any rows are returned
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No active trains found' });
-        }
 
         res.json(rows[0]);  // Return the first result set
     } catch (error) {
@@ -56,10 +46,6 @@ router.get('/active-shipments', async (req, res) => {
         const query = 'CALL GetActiveShipmentsByStore(?)';
         const [rows] = await pool.query(query, [StoreID]);
 
-        // Check if any rows are returned
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No active shipments found' });
-        }
 
         res.json(rows[0]);  // Return the first result set
     } catch (error) {
@@ -77,10 +63,6 @@ router.get('/instore-orders-list', async (req, res) => {
         const query = 'CALL GetInStoreOrdersByStore(?)';
         const [rows] = await pool.query(query, [StoreID]);
 
-        // Check if any rows are returned
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No in-store orders found' });
-        }
 
         res.json(rows[0]);  // Return the first result set
     } catch (error) {
@@ -134,10 +116,6 @@ router.get('/orders-in-train', async (req, res) => {
 
         console.log(`Fetched train assigned orders: ${rows[0].length} rows`);
 
-        // Check if any rows are returned
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No orders found in train' });
-        }
 
         res.json(rows[0]); // Return the first result set
     } catch (error) {
@@ -156,9 +134,6 @@ router.get('/orders-in-store', async (req, res) => {
         const [rows] = await pool.query(query, [StoreID, status]);
         console.log(`Fetched orders in store: ${rows[0].length} rows`);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No orders found in store' });
-        }
 
         res.json(rows[0]); // Return the first result set
     } catch (error) {
@@ -176,10 +151,6 @@ router.get('/orders-in-shipment', async (req, res) => {
         const [rows] = await pool.query(query, [StoreID, status]);
         console.log(`Fetched orders in shipment: ${rows[0].length} rows`);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No orders found in shipment' });
-        }
-
         res.json(rows[0]); // Return the first result set
     } catch (error) {
         console.log(error);
@@ -196,9 +167,6 @@ router.get('/orders-in-truck', async (req, res) => {
         const [rows] = await pool.query(query, [StoreID, status]);
         console.log(`Fetched orders in truck: ${rows[0].length} rows`);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No orders found in truck' });
-        }
 
         res.json(rows[0]); // Return the first result set
     } catch (error) {
@@ -229,10 +197,6 @@ router.get('/drivers', async (req, res) => {
 
         const [rows] = await pool.query(query, [StoreID]);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No drivers found' });
-        }
-
         res.json(rows[0]); // Return the first result set
     } catch (e) {
         console.log(e);
@@ -248,9 +212,6 @@ router.get('/assistants', async (req, res) => {
 
         const [rows] = await pool.query(query, [StoreID]);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No assistants found' });
-        }
 
         res.json(rows[0]); // Return the first result set
     } catch (e) {
@@ -267,9 +228,6 @@ router.get('/trucks', async (req, res) => {
 
         const [rows] = await pool.query(query, [StoreID]);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No trucks found' });
-        }
 
         res.json(rows[0]); // Return the first result set
     } catch (e) {
@@ -286,9 +244,6 @@ router.get('/routes', async (req, res) => {
 
         const [rows] = await pool.query(query, [StoreID]);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No routes found' });
-        }
 
         res.json(rows[0]); // Return the first result set
     } catch (e) {
@@ -305,9 +260,6 @@ router.get('/orders-by-shipment/:shipmentID', async (req, res) => {
 
         const [rows] = await pool.query(query, [shipmentID]);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No orders found for this shipment' });
-        }
 
         res.json(rows[0]); // Return the first result set
     } catch (e) {
@@ -324,9 +276,6 @@ router.get('/truck-schedule/:shipmentID', async (req, res) => {
 
         const [rows] = await pool.query(query, [shipmentID]);
 
-        if (rows[0].length === 0) {
-            return res.status(404).json({ message: 'No truck schedule found for this shipment' });
-        }
 
         res.json(rows[0]); // Return the first result set
     } catch (e) {
