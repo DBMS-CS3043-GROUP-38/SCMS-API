@@ -16,7 +16,7 @@ function getRandomTime() {
 
 // Function to generate a random train capacity
 function getRandomCapacity() {
-    return (Math.random() * 1000).toFixed(2); // Adjust the multiplier as per your requirement
+    return (Math.random() * 500 + 1000).toFixed(2); // Adjust the multiplier as per your requirement
 }
 
 // Function to create a random train record

@@ -59,7 +59,7 @@ cron.schedule('* * * * *', async () => {
         `);
 
         for (let shipment of shipments) {
-            if ((parseFloat(shipment.FilledCapacity) >= 0.8 * parseFloat(shipment.Capacity) || isOlderThan7Days(shipment.CreatedDate))) {
+            if ((parseFloat(shipment.FilledCapacity) >= 0.1 * parseFloat(shipment.Capacity) || isOlderThan7Days(shipment.CreatedDate))) {
                 await connection.promise().query(`
                     UPDATE shipment
                     SET Status = 'Ready'
@@ -195,17 +195,17 @@ cron.schedule('* * * * *', async () => {
 
             await connection.promise().query(`
                 INSERT INTO truckschedule (TruckID, DriverID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours, Status, RouteID)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'Not Completed', ?)
+                VALUES (?, ?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 HOUR), ?, ?, 'Not Completed', ?)
             `, [
                 truckID,
                 shipmentDriver.DriverID,
                 shipmentAssistant.AssistantID,
                 shipment.ShipmentID,
-                new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),  // ScheduleDateTime in UTC
                 shipment.StoreID,
-                secondsToTime(routeDuration),  // Hours in HH:MM:SS format
+                secondsToTime(routeDuration),
                 RouteID
             ]);
+
 
             console.log(`Driver ${shipmentDriver.DriverID} and assistant ${shipmentAssistant.AssistantID} assigned to truck ${truckID} to deliver shipment ${shipment.ShipmentID}.`);
         }
