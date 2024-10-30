@@ -8,11 +8,6 @@ const router = express.Router();
 const db = pool;
 
 
-// Connect to MySQL
-db.connect((err) => {
-  if (err) throw err;
-  console.log('Connected to MySQL');
-});
 
 // Other endpoints
 router.get('/assistant/:assistantID/schedules', (req, res) => {
