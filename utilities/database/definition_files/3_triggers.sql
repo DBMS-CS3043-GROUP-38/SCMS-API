@@ -180,6 +180,7 @@ end;
 
 
 CREATE TRIGGER update_completed_hours_and_availability
+
     AFTER UPDATE
     ON TruckSchedule
     FOR EACH ROW
@@ -219,6 +220,7 @@ CREATE TRIGGER insert_in_truck_orders
     AFTER UPDATE
     ON TruckSchedule
     FOR EACH ROW
+
 BEGIN
     -- Check if the status has changed to 'In Progress'
     IF NEW.Status = 'In Progress' AND OLD.Status <> 'In Progress' THEN
@@ -268,9 +270,9 @@ BEGIN
         FROM Order_tracking AS ot 
         WHERE ot.OrderID = s.OrderID AND ot.Status = 'Delivered'
       );
-
-  END IF;
+    END IF;
 END //
+
 
 
 # Chehan triggers

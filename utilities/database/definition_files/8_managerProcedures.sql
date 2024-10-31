@@ -59,7 +59,7 @@ END //
 CREATE PROCEDURE GetTruckScheduleStatusesByStore(IN sid INT)
 BEGIN
     SELECT Status, COUNT(TruckScheduleID) AS count
-    FROM truckschedule
+    FROM truck_schedule_with_details
     WHERE StoreID = sid
     GROUP BY Status;
 END //
@@ -283,7 +283,7 @@ BEGIN
         Address AS address,
         Contact AS contact,
         TotalVolume AS volume,
-        OrderDate AS orderDate
+        DATE_FORMAT(OrderDate, '%Y-%m-%d') AS orderDate
     FROM
         order_details_with_latest_status
             JOIN

@@ -60,7 +60,7 @@ router.post('/schedule-orders', async (req, res) => {
         const [trains] = await connection.query(`
             SELECT *
             FROM train_schedule_with_destinations
-            WHERE Status = 'Not Completed'
+            WHERE Status = 'Not Completed' and ScheduleDateTime > NOW()
             ORDER BY ScheduleDateTime
         `);
 
