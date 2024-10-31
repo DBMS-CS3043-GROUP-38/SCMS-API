@@ -91,7 +91,7 @@ async function userCreation(cities) {
 
     //Generate Drivers and Assistants for each store
     for (let i = 1; i <= cities.length; i++) {
-        const DriverCount = Math.floor(Math.random() * 10) + 10;
+        const DriverCount = Math.floor(Math.random() * 10) + 5;
         for (let j = 0; j < DriverCount; j++) {
             const name = faker.person.fullName();
             const randomNumber = Math.floor(Math.random() * 1000);
@@ -109,7 +109,7 @@ async function userCreation(cities) {
             await createEmployee(data);
         }
 
-        const AssistantCount = Math.floor(Math.random() * 10) + DriverCount;
+        const AssistantCount = Math.floor(Math.random() * 5) + DriverCount;
         for (let j = 0; j < AssistantCount; j++) {
             const name = faker.person.fullName();
             const randomNumber = Math.floor(Math.random() * 1000);

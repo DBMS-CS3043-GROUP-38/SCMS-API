@@ -199,8 +199,6 @@ cron.schedule('* * * * *', async () => {
         // Rollback the transaction in case of error
         await connection.promise().query('ROLLBACK');
         console.error("Error executing truck scheduling task:", error);
-    } finally {
-        connection.end();
     }
 });
 
