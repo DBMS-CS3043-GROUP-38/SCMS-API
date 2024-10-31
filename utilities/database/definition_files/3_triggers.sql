@@ -179,7 +179,8 @@ end;
 -- Update driver related triggers
 
 
-CREATE TRIGGER update_completed_hours_and_availability_and_deliver_orders
+CREATE TRIGGER update_completed_hours_and_availability
+
     AFTER UPDATE
     ON TruckSchedule
     FOR EACH ROW
@@ -211,13 +212,6 @@ BEGIN
         set Status = 'Available'
         where TruckID = NEW.TruckID;
 
-
-        -- Insert new entries in Order_tracking for each order in Shipment_contains
-        INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
-        SELECT s.OrderID, NOW(), 'Delivered'
-        FROM Shipment_contains AS s
-        WHERE s.ShipmentID = NEW.ShipmentID;
-
     END IF;
 END //
 
@@ -226,6 +220,7 @@ CREATE TRIGGER insert_in_truck_orders
     AFTER UPDATE
     ON TruckSchedule
     FOR EACH ROW
+
 BEGIN
     -- Check if the status has changed to 'In Progress'
     IF NEW.Status = 'In Progress' AND OLD.Status <> 'In Progress' THEN
@@ -257,6 +252,27 @@ BEGIN
 
     END IF;
 END //
+
+CREATE TRIGGER check_and_put_back_undelivered_orders
+AFTER UPDATE ON TruckSchedule
+FOR EACH ROW
+BEGIN
+  -- Check if the status has changed to 'In Progress'
+  IF NEW.Status = 'Completed' AND OLD.Status <> 'Completed' THEN
+
+    -- Insert new entries in Order_tracking for each order in Shipment_contains
+    INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
+    SELECT s.OrderID, NOW(), 'InStore'
+    FROM Shipment_contains AS s
+    WHERE s.ShipmentID = NEW.ShipmentID
+    AND NOT EXISTS (
+        SELECT 1 
+        FROM Order_tracking AS ot 
+        WHERE ot.OrderID = s.OrderID AND ot.Status = 'Delivered'
+      );
+    END IF;
+END //
+
 
 
 # Chehan triggers
