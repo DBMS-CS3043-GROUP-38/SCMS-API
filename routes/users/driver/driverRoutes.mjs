@@ -43,16 +43,15 @@ router.get('/driver/:driverID/schedules', async (req, res) => {
   try{
     const driverID = req.params.driverID;
     const query = `
-      SELECT t.TruckScheduleID, t.RouteID, t.TruckID, t.StoreID, t.ShipmentID, t.Status, t.ScheduleDateTime, e.Name 
-      FROM TruckSchedule AS t 
-      INNER JOIN login_info_view AS e ON t.AssistantID = e.AssistantID 
-      WHERE t.DriverID = ? AND (t.Status = 'Not Completed' OR t.Status = 'In Progress')
-      ORDER BY t.ScheduleDateTime ASC;
+      SELECT TruckScheduleID, LicencePlate, RouteID, StoreCity, ShipmentID, Status, ScheduleDateTime, AssistantName 
+      FROM truck_schedule_with_details
+      WHERE DriverID = ? AND (Status = 'Not Completed' OR Status = 'In Progress')
+      ORDER BY ScheduleDateTime ASC;
     `; 
     const [results] = await db.query(query, [driverID]);
       if (results.length === 0)
         return res.status(404).json({ success: false, message: 'No schedules found' });
-      res.json(results); 
+      res.json(results);  
   }catch(e){
     console.error(e);
     res.status(500).json({error: "Failed to get Driver Schedules"});
