@@ -183,28 +183,35 @@ CREATE TRIGGER update_completed_hours_and_availability_and_deliver_orders
 AFTER UPDATE ON TruckSchedule
 FOR EACH ROW
 BEGIN
+
+    declare Hours time;
   -- Check if the status has changed to 'Completed'
   IF NEW.Status = 'Completed' AND OLD.Status <> 'Completed' THEN
-    
+
+      SELECT r.Time_duration INTO Hours
+      FROM Shipment s
+               JOIN Route r ON s.RouteID = r.RouteID
+      WHERE s.ShipmentID = NEW.ShipmentID;
+
     -- Update CompletedHours for the Driver
     UPDATE Driver
-    SET CompletedHours = ADDTIME(CompletedHours, NEW.Hours),
+    SET CompletedHours = ADDTIME(CompletedHours, Hours),
     Status = 'Available'
     WHERE DriverID = NEW.DriverID;
-    
+
     -- Update CompletedHours for the Assistant
     UPDATE Assistant
-    SET CompletedHours = ADDTIME(CompletedHours, NEW.Hours),
+    SET CompletedHours = ADDTIME(CompletedHours, Hours),
     Status = 'Available'
     WHERE AssistantID = NEW.AssistantID;
 
-    
+
     -- Insert new entries in Order_tracking for each order in Shipment_contains
     INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
     SELECT s.OrderID, NOW(), 'Delivered'
     FROM Shipment_contains AS s
     WHERE s.ShipmentID = NEW.ShipmentID;
-  
+
   END IF;
 END //
 

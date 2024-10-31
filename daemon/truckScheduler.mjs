@@ -18,17 +18,8 @@ const connection = mysql.createConnection({
 connection.connect((err) => {
     if (err) {
         console.error('Error connecting to the database:', err.stack);
-        return;
     }
 });
-
-// Utility function to check if a date is at least 7 days old
-function isOlderThan7Days(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const daysDifference = (now - date) / (1000 * 60 * 60 * 24);
-    return daysDifference > 7;
-}
 
 function timeToSeconds(timeStr) {
     const [hours, minutes, seconds] = timeStr.split(':').map(Number);
@@ -113,7 +104,7 @@ cron.schedule('* * * * *', async () => {
             for (let driver of drivers) {
                 const [lastSchedule] = await connection.promise().query(`
                     SELECT EndTime
-                    FROM TruckScheduleDetails
+                    FROM truck_schedule_with_details
                     WHERE DriverID = ?
                     ORDER BY EndTime DESC
                     LIMIT 1
@@ -131,8 +122,8 @@ cron.schedule('* * * * *', async () => {
 
             for (let assistant of assistants) {
                 const [lastEntries] = await connection.promise().query(`
-                    SELECT StartTime, EndTime
-                    FROM TruckScheduleDetails
+                    SELECT ScheduleDateTime, EndTime
+                    FROM truck_schedule_with_details
                     WHERE AssistantID = ?
                     ORDER BY EndTime DESC
                     LIMIT 2
@@ -179,9 +170,9 @@ cron.schedule('* * * * *', async () => {
             `, [shipmentAssistant.AssistantID]);
 
             await connection.promise().query(`
-                INSERT INTO truckschedule (TruckID, DriverID, AssistantID,ScheduleDateTime, ShipmentID, StoreID, Hours,
-                                           Status, RouteID)
-                VALUES (?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 2 HOUR ), ?, ?, ?,'Not Completed', ?)
+                INSERT INTO truckschedule (TruckID, DriverID, AssistantID,ScheduleDateTime, ShipmentID,
+                                           Status)
+                VALUES (?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 2 HOUR ), ?,'Not Completed')
             `, [
                 truckID,
                 shipmentDriver.DriverID,

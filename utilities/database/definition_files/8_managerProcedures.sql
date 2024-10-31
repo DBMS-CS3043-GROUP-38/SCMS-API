@@ -59,7 +59,7 @@ END //
 CREATE PROCEDURE GetTruckScheduleStatusesByStore(IN sid INT)
 BEGIN
     SELECT Status, COUNT(TruckScheduleID) AS count
-    FROM truckschedule
+    FROM truck_schedule_with_details
     WHERE StoreID = sid
     GROUP BY Status;
 END //

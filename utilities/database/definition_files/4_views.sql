@@ -86,38 +86,45 @@ FROM `Order` o
 ;
 //
 
+create view shipment_progress as
+SELECT sc.ShipmentID,
+       COUNT(sc.OrderID) AS TotalOrders,
+       SUM(IF(ods.LatestStatus = 'Delivered', 1, 0)) AS Delivered
+FROM shipment_contains sc
+         JOIN order_details_with_latest_status ods ON sc.OrderID = ods.OrderID
+GROUP BY sc.ShipmentID
+//
+
 # Truck schedule with details
-create view truck_schedule_with_details as
-select ts.TruckScheduleID,
-       ts.StoreID,
+CREATE OR REPLACE VIEW truck_schedule_with_details AS
+SELECT ts.TruckScheduleID,
+       s.StoreID,
        ts.ShipmentID,
        ts.ScheduleDateTime,
-       ts.RouteID,
+       DATE_ADD(ts.ScheduleDateTime, INTERVAL TIME_TO_SEC(r.Time_duration) SECOND) AS EndTime,  -- Calculating EndTime
+       shipment_progress.RouteID,
        ts.AssistantID,
        ts.DriverID,
        ts.TruckID,
-       ts.Hours,
+       r.Time_duration as Hours,
        ts.Status,
-       s.City as StoreCity,
-       a.Name as AssistantName,
-       d.Name as DriverName,
+       s.City AS StoreCity,
+       a.Name AS AssistantName,
+       d.Name AS DriverName,
        t.LicencePlate,
-       Status.TotalOrders,
-       Status.Delivered
-from truckschedule ts
-         join truck t on ts.TruckID = t.TruckID
-         join route r on ts.RouteID = r.RouteID
-         join store s on t.StoreID = s.StoreID
-         join driver_details_with_employee d on ts.DriverID = d.DriverID
-         join assistant_details_with_employee a on ts.AssistantID = a.AssistantID
-         join (select Shipment_contains.ShipmentID,
-                      COUNT(Shipment_contains.OrderID)          as TotalOrders,
-                      SUM(IF(LatestStatus = 'Delivered', 1, 0)) as Delivered
-               from shipment_contains
-                        join order_details_with_latest_status
-                             on shipment_contains.OrderID = Order_Details_With_Latest_Status.OrderID
-               group by ShipmentID) as status on ts.ShipmentID = status.ShipmentID
-;
+       shipment_progress.TotalOrders,
+       shipment_progress.Delivered
+FROM truckschedule ts
+         JOIN truck t ON ts.TruckID = t.TruckID
+         JOIN driver_details_with_employee d ON ts.DriverID = d.DriverID
+         JOIN assistant_details_with_employee a ON ts.AssistantID = a.AssistantID
+         JOIN (
+             select s.ShipmentID,s.RouteID, p.TotalOrders, p.Delivered from shipment_progress p join shipment s on p.ShipmentID = s.ShipmentID
+    ) AS shipment_progress ON ts.ShipmentID = shipment_progress.ShipmentID
+         JOIN route r ON shipment_progress.RouteID = r.RouteID
+         JOIN store s ON r.StoreID = s.StoreID
+ORDER BY EndTime DESC;
+//
 
 
 # To get the order details with the latest status and some more details
@@ -162,6 +169,7 @@ FROM `Order` o
      `Order_Tracking` ot ON o.OrderID = ot.OrderID
 WHERE ot.Status not in ('Cancelled', 'Attention')
 GROUP BY YEAR(o.OrderDate), QUARTER(o.OrderDate), s.StoreID;
+//
 
 create view Train_Schedule_With_Destinations as
 select ts.TrainScheduleID,
@@ -225,32 +233,34 @@ CREATE VIEW Truck_Distances AS
 SELECT ts.TruckID,
        SUM(r.Distance) AS TotalDistance
 FROM TruckSchedule ts
-         JOIN Route r ON ts.RouteID = r.RouteID
+    join shipment on ts.ShipmentID = shipment.ShipmentID
+         JOIN Route r ON shipment.RouteID = r.RouteID
 WHERE ts.Status = 'Completed'
 GROUP BY ts.TruckID;
 //
 
 
 -- Shakthi - View for Driver and Assistant login
-create view login_info_view as select e.Type, e.EmployeeID, e.Name, e.Username, e.PasswordHash, a.AssistantID, d.DriverID 
-from Employee as e 
-left join Assistant as a on e.EmployeeID = a.EmployeeID 
-left join Driver as d on e.EmployeeID = d.EmployeeID where e.Type = ('Driver') or e.Type = ('Assistant') ;
+create view login_info_view as
+select e.Type, e.EmployeeID, e.Name, e.Username, e.PasswordHash, a.AssistantID, d.DriverID
+from Employee as e
+         left join Assistant as a on e.EmployeeID = a.EmployeeID
+         left join Driver as d on e.EmployeeID = d.EmployeeID
+where e.Type = ('Driver')
+   or e.Type = ('Assistant');
 
 //
 
 # Rashmika customer views
 CREATE VIEW customer_profile AS
-SELECT
-    CustomerID,
-    Name,
-    Username,
-    Address,
-    Type,
-    City,
-    Contact
-FROM
-    Customer;
+SELECT CustomerID,
+       Name,
+       Username,
+       Address,
+       Type,
+       City,
+       Contact
+FROM Customer;
 //
 
 # Chehan's
@@ -264,8 +274,9 @@ CREATE OR REPLACE VIEW AvailableDrivers AS
 SELECT d.DriverID, d.CompletedHours, e.StoreID
 FROM driver d
          JOIN employee e ON d.EmployeeID = e.EmployeeID
-WHERE d.Status = 'Available' AND CompletedHours <= 40
-ORDER BY d.CompletedHours ASC
+WHERE d.Status = 'Available'
+  AND d.CompletedHours <= d.WorkingHours
+ORDER BY d.CompletedHours
 ;
 //
 
@@ -273,24 +284,12 @@ CREATE OR REPLACE VIEW AvailableAssistants AS
 SELECT a.AssistantID, a.CompletedHours, e.StoreID
 FROM assistant a
          JOIN employee e ON a.EmployeeID = e.EmployeeID
-WHERE a.Status = 'Available' AND CompletedHours <= 60
-ORDER BY a.CompletedHours ASC
+WHERE a.Status = 'Available'
+  AND a.CompletedHours <= a.WorkingHours
+ORDER BY a.CompletedHours
 ;
 //
 
-CREATE OR REPLACE VIEW TruckScheduleDetails AS
-SELECT
-    TruckScheduleID,
-    TruckID,
-    DriverID,
-    AssistantID,
-    ScheduleDateTime AS StartTime,
-    DATE_ADD(ScheduleDateTime, INTERVAL TIME_TO_SEC(Hours) SECOND) AS EndTime
-FROM
-    TruckSchedule
-ORDER BY
-    EndTime DESC;
-//
 
 
 DELIMITER ;
