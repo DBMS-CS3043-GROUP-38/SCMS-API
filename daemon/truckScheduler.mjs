@@ -114,7 +114,7 @@ cron.schedule('* * * * *', async () => {
                 const lastScheduleEndTime = lastSchedule.length ? new Date(lastSchedule[0].EndTime) : null;
                 const hoursDifference = lastScheduleEndTime ? (now - lastScheduleEndTime) / (1000 * 60 * 60) : Infinity;
 
-                if (hoursDifference >= 4 && timeToSeconds(driver.CompletedHours) + routeDuration <= 3600 * 40) {
+                if (hoursDifference >= 6 && timeToSeconds(driver.CompletedHours) + routeDuration <= 3600 * 40) {
                     shipmentDriver = driver;
                     break;
                 }
@@ -138,7 +138,7 @@ cron.schedule('* * * * *', async () => {
                 if (lastEntries.length === 2) {
                     const timeGap = (new Date(lastEntries[0].StartTime) - new Date(lastEntries[1].EndTime)) / (1000 * 60 * 60);
                     const timeGapTillCurrentTime = (now - new Date(lastEntries[0].EndTime)) / (1000 * 60 * 60);
-                    if (timeGap >= 3 && timeToSeconds(assistant.CompletedHours) + routeDuration <= 60 * 3600 && timeGapTillCurrentTime >= 3) {
+                    if (timeGap >= 6 && timeToSeconds(assistant.CompletedHours) + routeDuration <= 60 * 3600 && timeGapTillCurrentTime >= 3) {
                         shipmentAssistant = assistant;
                         break;
                     }

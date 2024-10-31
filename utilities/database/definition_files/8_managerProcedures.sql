@@ -283,7 +283,7 @@ BEGIN
         Address AS address,
         Contact AS contact,
         TotalVolume AS volume,
-        OrderDate AS orderDate
+        DATE_FORMAT(OrderDate, '%Y-%m-%d') AS orderDate
     FROM
         order_details_with_latest_status
             JOIN

@@ -1,6 +1,12 @@
 import pool from '../database/db.mjs';
 
 
+// Function to generate random float capacities between 5 and 10
+function randomCapacity() {
+    return (Math.random() * 5) + 5;
+}
+
+
 async function productCreation(products) {
     let createdProducts = 0;
 
@@ -8,7 +14,7 @@ async function productCreation(products) {
         const product = products[i];
         const { Name, TrainCapacityConsumption, Price, Type } = product;
         const query = `INSERT INTO product (Name, TrainCapacityConsumption, Price, Type) VALUE (?, ?, ?, ?)`;
-        const values = [Name, TrainCapacityConsumption, Price, Type];
+        const values = [Name, randomCapacity(), Price, Type];
         try {
             const result = await pool.query(query, values);
             createdProducts++;
