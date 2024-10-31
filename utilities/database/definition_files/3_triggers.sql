@@ -244,4 +244,29 @@ BEGIN
   END IF;
 END //
 
+
+# Chehan triggers
+CREATE TRIGGER check_shipment_status_after_insert
+    AFTER INSERT ON Shipment_contains
+    FOR EACH ROW
+BEGIN
+    DECLARE shipment_capacity DECIMAL(10, 2);
+    DECLARE shipment_filled_capacity DECIMAL(10, 2);
+    DECLARE shipment_created_date DATE;
+
+    -- Retrieve the relevant shipment data
+    SELECT Capacity, FilledCapacity, CreatedDate
+    INTO shipment_capacity, shipment_filled_capacity, shipment_created_date
+    FROM Shipment
+    WHERE ShipmentID = NEW.ShipmentID;
+
+    -- Check if the capacity is at least 80% filled or if it's older than 7 days
+    IF (shipment_filled_capacity >= 0.8 * shipment_capacity) OR (DATEDIFF(CURDATE(), shipment_created_date) > 7) THEN
+        -- Update the shipment status to 'Ready'
+        UPDATE Shipment
+        SET Status = 'Ready'
+        WHERE ShipmentID = NEW.ShipmentID;
+    END IF;
+END//
+
 DELIMITER ;

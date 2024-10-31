@@ -51,24 +51,8 @@ cron.schedule('* * * * *', async () => {
         // Start a transaction
         await connection.promise().query('START TRANSACTION');
 
-        // Update 'NotReady' shipments to 'Ready'
-        const [shipments] = await connection.promise().query(`
-            SELECT ShipmentID, CreatedDate, FilledCapacity, Capacity, RouteID
-            FROM shipment
-            WHERE Status = 'NotReady'
-        `);
 
-        for (let shipment of shipments) {
-            if ((parseFloat(shipment.FilledCapacity) >= 0.8 * parseFloat(shipment.Capacity) || isOlderThan7Days(shipment.CreatedDate))) {
-                await connection.promise().query(`
-                    UPDATE shipment
-                    SET Status = 'Ready'
-                    WHERE ShipmentID = ?
-                `, [shipment.ShipmentID]);
-            }
-        }
-
-        // Step 2: Assign 'Ready' shipments to trucks
+        // Step 1: Assign 'Ready' shipments to trucks
         const [readyShipments] = await connection.promise().query(`
             SELECT s.ShipmentID, r.StoreID, s.RouteID
             FROM shipment s
@@ -125,7 +109,7 @@ cron.schedule('* * * * *', async () => {
 
             const routeDuration = timeToSeconds(route[0].Time_duration);
 
-            // Step 3: Assign driver and assistant according to roster rules
+            // Step 2: Assign driver and assistant according to roster rules
             for (let driver of drivers) {
                 const [lastSchedule] = await connection.promise().query(`
                     SELECT EndTime
@@ -195,18 +179,14 @@ cron.schedule('* * * * *', async () => {
             `, [shipmentAssistant.AssistantID]);
 
             await connection.promise().query(`
-                INSERT INTO truckschedule (TruckID, DriverID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours,
+                INSERT INTO truckschedule (TruckID, DriverID, AssistantID,ScheduleDateTime, ShipmentID, StoreID, Hours,
                                            Status, RouteID)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'Not Completed', ?)
+                VALUES (?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 2 HOUR ), ?, ?, ?,'Not Completed', ?)
             `, [
                 truckID,
                 shipmentDriver.DriverID,
                 shipmentAssistant.AssistantID,
                 shipment.ShipmentID,
-                new Date(Date.now() + 12 * 60 * 60 * 1000)
-                    .toISOString()
-                    .slice(0, 19)
-                    .replace('T', ' '),  // ScheduleDateTime in UTC
                 shipment.StoreID,
                 secondsToTime(routeDuration),  // Hours in HH:MM:SS format
                 RouteID
