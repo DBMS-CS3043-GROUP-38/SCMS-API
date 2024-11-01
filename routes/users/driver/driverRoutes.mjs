@@ -126,15 +126,33 @@ router.post('/update-status', async (req, res) => {
 router.get('/get-employee/:employeeId', async (req, res) => {
   try{
     const employeeId = req.params.employeeId;
-    const query = `
-      SELECT e.Name, e.Address, e.Contact, e.Type, e.Username, d.WorkingHours, d.CompletedHours 
-      FROM Employee AS e 
-      INNER JOIN Driver AS d ON e.EmployeeID = d.EmployeeID 
-      WHERE e.EmployeeID = ${employeeId};
-    `;
-    const [results] = await db.query(query, [employeeId]);
-    if (results.length === 0)
+    const prequery = `SELECT Type FROM login_info_view 
+    WHERE EmployeeID = ?;`;
+
+    
+    
+    const [preRes] = await db.query(prequery, [employeeId]);
+    if (preRes.length === 0)
       return res.status(404).send('Employee not found');
+    
+    let query;
+
+    if(preRes[0]['Type'] == 'Driver')
+      query = `
+        SELECT e.Name, e.Address, e.Contact, e.Type, e.Username, d.WorkingHours, d.CompletedHours 
+        FROM Employee AS e 
+        INNER JOIN Driver AS d ON e.EmployeeID = d.EmployeeID 
+        WHERE e.EmployeeID = ${employeeId};
+      `;
+    else
+      query = `
+          SELECT e.Name, e.Address, e.Contact, e.Type, e.Username, d.WorkingHours, d.CompletedHours 
+          FROM Employee AS e 
+          INNER JOIN Assistant AS d ON e.EmployeeID = d.EmployeeID 
+          WHERE e.EmployeeID = ${employeeId};
+        `;
+    const [results] = await db.query(query, [employeeId]);
+    
     res.status(200).json(results[0]);
   }catch (e){
     console.error(e);
