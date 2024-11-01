@@ -58,6 +58,7 @@ router.get('/assistant/:shipment_id/get-orders', async (req, res) => {
     const query = `SELECT s.OrderID, 
        c.Name, 
        c.Address,
+       c.Contact,
        CASE 
            WHEN EXISTS (
                SELECT 1 
