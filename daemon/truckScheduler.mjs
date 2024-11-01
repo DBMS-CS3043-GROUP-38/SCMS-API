@@ -83,7 +83,7 @@ cron.schedule('* * * * *', async () => {
                 WHERE StoreID = ?
             `, [shipment.StoreID]);
 
-            if (trucks.length === 0 || assistants.length === 0 || drivers.length === 0 || trucks.length === 0) {
+            if (trucks.length === 0 || assistants.length === 0 || drivers.length === 0) {
                 console.log(`No available truck, driver or assistant found for shipment ${shipment.ShipmentID}.`);
                 continue;
             }
@@ -138,10 +138,14 @@ cron.schedule('* * * * *', async () => {
                 if (lastEntries.length === 2) {
                     const timeGap = (new Date(lastEntries[0].StartTime) - new Date(lastEntries[1].EndTime)) / (1000 * 60 * 60);
                     const timeGapTillCurrentTime = (now - new Date(lastEntries[0].EndTime)) / (1000 * 60 * 60);
-                    if (timeGap >= 6 && timeToSeconds(assistant.CompletedHours) + routeDuration <= 60 * 3600 && timeGapTillCurrentTime >= 3) {
-                        shipmentAssistant = assistant;
-                        break;
+                    if (timeGap < 6 && timeGapTillCurrentTime < 6) {
+                        continue
                     }
+                    if (timeToSeconds(assistant.CompletedHours) + routeDuration <= 60 * 3600) {
+                        shipmentAssistant = assistant;
+                        break
+                    }
+
                 }
             }
 
