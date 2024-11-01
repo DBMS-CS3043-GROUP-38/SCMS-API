@@ -312,6 +312,7 @@ BEGIN
         Delivered AS 'Delivered',
         TotalOrders AS 'Total Orders',
         ScheduleDateTime AS 'Schedule Time',
+        EndTime AS 'Estimated End Time',
         Status AS 'Status'
     FROM
         truck_schedule_with_details
