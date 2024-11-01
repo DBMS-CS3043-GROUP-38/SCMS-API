@@ -89,26 +89,28 @@ async function userCreation(cities) {
         await createEmployee(data);
     }
 
-    const AssistantCount = Math.floor(Math.random() * 3) + 4
-    for (let j = 0; j < AssistantCount; j++) {
-        const name = faker.person.fullName();
-        const randomNumber = Math.floor(Math.random() * 1000);
-        const username = name.split(' ').join('').toLowerCase() + randomNumber;
-
-        const data = {
-            name: name,
-            username: username,
-            address: faker.location.streetAddress(),
-            password: 'Password@Assistant',
-            type: 'Assistant',
-            StoreID: i,
-            contact: faker.phone.number({style: 'national'})
-        };
-        await createEmployee(data);
-    }
 
     //Generate Drivers and Assistants for each store
     for (let i = 1; i <= cities.length; i++) {
+        const AssistantCount = Math.floor(Math.random() * 3) + 4
+        for (let j = 0; j < AssistantCount; j++) {
+            const name = faker.person.fullName();
+            const randomNumber = Math.floor(Math.random() * 1000);
+            const username = name.split(' ').join('').toLowerCase() + randomNumber;
+
+            const data = {
+                name: name,
+                username: username,
+                address: faker.location.streetAddress(),
+                password: 'Password@Assistant',
+                type: 'Assistant',
+                StoreID: i,
+                contact: faker.phone.number({style: 'national'})
+            };
+            await createEmployee(data);
+        }
+
+
         const DriverCount = Math.floor(Math.random() * 3) + AssistantCount;
         for (let j = 0; j < DriverCount; j++) {
             const name = faker.person.fullName();
@@ -126,8 +128,6 @@ async function userCreation(cities) {
             };
             await createEmployee(data);
         }
-
-
     }
 
     //Generate randomNumberOfCustomers Customers
