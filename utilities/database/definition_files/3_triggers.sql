@@ -179,69 +179,125 @@ end;
 -- Update driver related triggers
 
 
-CREATE TRIGGER update_completed_hours_and_availability_and_deliver_orders
-AFTER UPDATE ON TruckSchedule
-FOR EACH ROW
-BEGIN
-  -- Check if the status has changed to 'Completed'
-  IF NEW.Status = 'Completed' AND OLD.Status <> 'Completed' THEN
-    
-    -- Update CompletedHours for the Driver
-    UPDATE Driver
-    SET CompletedHours = ADDTIME(CompletedHours, NEW.Hours),
-    Status = 'Available'
-    WHERE DriverID = NEW.DriverID;
-    
-    -- Update CompletedHours for the Assistant
-    UPDATE Assistant
-    SET CompletedHours = ADDTIME(CompletedHours, NEW.Hours),
-    Status = 'Available'
-    WHERE AssistantID = NEW.AssistantID;
+CREATE TRIGGER update_completed_hours_and_availability
 
-    
-    -- Insert new entries in Order_tracking for each order in Shipment_contains
-    INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
-    SELECT s.OrderID, NOW(), 'Delivered'
-    FROM Shipment_contains AS s
-    WHERE s.ShipmentID = NEW.ShipmentID;
-  
-  END IF;
+    AFTER UPDATE
+    ON TruckSchedule
+    FOR EACH ROW
+BEGIN
+
+    declare Hours time;
+    -- Check if the status has changed to 'Completed'
+    IF NEW.Status = 'Completed' AND OLD.Status <> 'Completed' THEN
+
+        SELECT r.Time_duration
+        INTO Hours
+        FROM Shipment s
+                 JOIN Route r ON s.RouteID = r.RouteID
+        WHERE s.ShipmentID = NEW.ShipmentID;
+
+        -- Update CompletedHours for the Driver
+        UPDATE Driver
+        SET CompletedHours = ADDTIME(CompletedHours, Hours),
+            Status         = 'Available'
+        WHERE DriverID = NEW.DriverID;
+
+        -- Update CompletedHours for the Assistant
+        UPDATE Assistant
+        SET CompletedHours = ADDTIME(CompletedHours, Hours),
+            Status         = 'Available'
+        WHERE AssistantID = NEW.AssistantID;
+
+        update truck
+        set Status = 'Available'
+        where TruckID = NEW.TruckID;
+
+    END IF;
 END //
 
 
 CREATE TRIGGER insert_in_truck_orders
+    AFTER UPDATE
+    ON TruckSchedule
+    FOR EACH ROW
+
+BEGIN
+    -- Check if the status has changed to 'In Progress'
+    IF NEW.Status = 'In Progress' AND OLD.Status <> 'In Progress' THEN
+
+        -- Insert new entries in Order_tracking for each order in Shipment_contains
+        INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
+        SELECT s.OrderID, NOW(), 'InTruck'
+        FROM Shipment_contains AS s
+        WHERE s.ShipmentID = NEW.ShipmentID;
+
+    END IF;
+END //
+
+CREATE TRIGGER revert_in_truck_orders
+    AFTER UPDATE
+    ON TruckSchedule
+    FOR EACH ROW
+BEGIN
+    -- Check if the status has changed to 'Not Completed'
+    IF NEW.Status = 'Not Completed' AND OLD.Status = 'In Progress' THEN
+
+        -- Delete new entries in Order_tracking for each order in Shipment_contains
+        DELETE
+        FROM Order_tracking
+        WHERE OrderID IN (SELECT OrderID
+                          FROM Shipment_contains
+                          WHERE ShipmentID = NEW.ShipmentID)
+          AND Status = 'InTruck';
+
+    END IF;
+END //
+
+CREATE TRIGGER check_and_put_back_undelivered_orders
 AFTER UPDATE ON TruckSchedule
 FOR EACH ROW
 BEGIN
   -- Check if the status has changed to 'In Progress'
-  IF NEW.Status = 'In Progress' AND OLD.Status <> 'In Progress' THEN
+  IF NEW.Status = 'Completed' AND OLD.Status <> 'Completed' THEN
 
     -- Insert new entries in Order_tracking for each order in Shipment_contains
     INSERT INTO Order_tracking (OrderID, TimeStamp, Status)
-    SELECT s.OrderID, NOW(), 'InTruck'
+    SELECT s.OrderID, NOW(), 'InStore'
     FROM Shipment_contains AS s
-    WHERE s.ShipmentID = NEW.ShipmentID;
-
-  END IF;
+    WHERE s.ShipmentID = NEW.ShipmentID
+    AND NOT EXISTS (
+        SELECT 1 
+        FROM Order_tracking AS ot 
+        WHERE ot.OrderID = s.OrderID AND ot.Status = 'Delivered'
+      );
+    END IF;
 END //
 
-CREATE TRIGGER revert_in_truck_orders
-AFTER UPDATE ON TruckSchedule
-FOR EACH ROW
+
+
+# Chehan triggers
+CREATE TRIGGER check_shipment_status_after_insert
+    AFTER INSERT
+    ON Shipment_contains
+    FOR EACH ROW
 BEGIN
-  -- Check if the status has changed to 'Not Completed'
-  IF NEW.Status = 'Not Completed' AND OLD.Status = 'In Progress' THEN
+    DECLARE shipment_capacity DECIMAL(10, 2);
+    DECLARE shipment_filled_capacity DECIMAL(10, 2);
+    DECLARE shipment_created_date DATE;
 
-    -- Delete new entries in Order_tracking for each order in Shipment_contains
-    DELETE FROM Order_tracking
-    WHERE OrderID IN (
-      SELECT OrderID 
-      FROM Shipment_contains 
-      WHERE ShipmentID = NEW.ShipmentID
-    ) 
-    AND Status = 'InTruck';
+    -- Retrieve the relevant shipment data
+    SELECT Capacity, FilledCapacity, CreatedDate
+    INTO shipment_capacity, shipment_filled_capacity, shipment_created_date
+    FROM Shipment
+    WHERE ShipmentID = NEW.ShipmentID;
 
-  END IF;
-END //
+    -- Check if the capacity is at least 80% filled or if it's older than 7 days
+    IF (shipment_filled_capacity >= 0.8 * shipment_capacity) OR (DATEDIFF(CURDATE(), shipment_created_date) > 7) THEN
+        -- Update the shipment status to 'Ready'
+        UPDATE Shipment
+        SET Status = 'Ready'
+        WHERE ShipmentID = NEW.ShipmentID;
+    END IF;
+END//
 
 DELIMITER ;

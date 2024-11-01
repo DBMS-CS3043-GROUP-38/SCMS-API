@@ -18,17 +18,8 @@ const connection = mysql.createConnection({
 connection.connect((err) => {
     if (err) {
         console.error('Error connecting to the database:', err.stack);
-        return;
     }
 });
-
-// Utility function to check if a date is at least 7 days old
-function isOlderThan7Days(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const daysDifference = (now - date) / (1000 * 60 * 60 * 24);
-    return daysDifference > 7;
-}
 
 function timeToSeconds(timeStr) {
     const [hours, minutes, seconds] = timeStr.split(':').map(Number);
@@ -51,24 +42,8 @@ cron.schedule('* * * * *', async () => {
         // Start a transaction
         await connection.promise().query('START TRANSACTION');
 
-        // Update 'NotReady' shipments to 'Ready'
-        const [shipments] = await connection.promise().query(`
-            SELECT ShipmentID, CreatedDate, FilledCapacity, Capacity, RouteID
-            FROM shipment
-            WHERE Status = 'NotReady'
-        `);
 
-        for (let shipment of shipments) {
-            if ((parseFloat(shipment.FilledCapacity) >= 0.8 * parseFloat(shipment.Capacity) || isOlderThan7Days(shipment.CreatedDate))) {
-                await connection.promise().query(`
-                    UPDATE shipment
-                    SET Status = 'Ready'
-                    WHERE ShipmentID = ?
-                `, [shipment.ShipmentID]);
-            }
-        }
-
-        // Step 2: Assign 'Ready' shipments to trucks
+        // Step 1: Assign 'Ready' shipments to trucks
         const [readyShipments] = await connection.promise().query(`
             SELECT s.ShipmentID, r.StoreID, s.RouteID
             FROM shipment s
@@ -108,7 +83,7 @@ cron.schedule('* * * * *', async () => {
                 WHERE StoreID = ?
             `, [shipment.StoreID]);
 
-            if (trucks.length === 0 || assistants.length === 0 || drivers.length === 0 || trucks.length === 0) {
+            if (trucks.length === 0 || assistants.length === 0 || drivers.length === 0) {
                 console.log(`No available truck, driver or assistant found for shipment ${shipment.ShipmentID}.`);
                 continue;
             }
@@ -125,11 +100,11 @@ cron.schedule('* * * * *', async () => {
 
             const routeDuration = timeToSeconds(route[0].Time_duration);
 
-            // Step 3: Assign driver and assistant according to roster rules
+            // Step 2: Assign driver and assistant according to roster rules
             for (let driver of drivers) {
                 const [lastSchedule] = await connection.promise().query(`
                     SELECT EndTime
-                    FROM TruckScheduleDetails
+                    FROM truck_schedule_with_details
                     WHERE DriverID = ?
                     ORDER BY EndTime DESC
                     LIMIT 1
@@ -139,7 +114,7 @@ cron.schedule('* * * * *', async () => {
                 const lastScheduleEndTime = lastSchedule.length ? new Date(lastSchedule[0].EndTime) : null;
                 const hoursDifference = lastScheduleEndTime ? (now - lastScheduleEndTime) / (1000 * 60 * 60) : Infinity;
 
-                if (hoursDifference >= 4 && timeToSeconds(driver.CompletedHours) + routeDuration <= 3600 * 40) {
+                if (hoursDifference >= 6 && timeToSeconds(driver.CompletedHours) + routeDuration <= 3600 * 40) {
                     shipmentDriver = driver;
                     break;
                 }
@@ -147,8 +122,8 @@ cron.schedule('* * * * *', async () => {
 
             for (let assistant of assistants) {
                 const [lastEntries] = await connection.promise().query(`
-                    SELECT StartTime, EndTime
-                    FROM TruckScheduleDetails
+                    SELECT ScheduleDateTime, EndTime
+                    FROM truck_schedule_with_details
                     WHERE AssistantID = ?
                     ORDER BY EndTime DESC
                     LIMIT 2
@@ -163,10 +138,14 @@ cron.schedule('* * * * *', async () => {
                 if (lastEntries.length === 2) {
                     const timeGap = (new Date(lastEntries[0].StartTime) - new Date(lastEntries[1].EndTime)) / (1000 * 60 * 60);
                     const timeGapTillCurrentTime = (now - new Date(lastEntries[0].EndTime)) / (1000 * 60 * 60);
-                    if (timeGap >= 3 && timeToSeconds(assistant.CompletedHours) + routeDuration <= 60 * 3600 && timeGapTillCurrentTime >= 3) {
-                        shipmentAssistant = assistant;
-                        break;
+                    if (timeGap < 6 && timeGapTillCurrentTime < 6) {
+                        continue
                     }
+                    if (timeToSeconds(assistant.CompletedHours) + routeDuration <= 60 * 3600) {
+                        shipmentAssistant = assistant;
+                        break
+                    }
+
                 }
             }
 
@@ -195,18 +174,14 @@ cron.schedule('* * * * *', async () => {
             `, [shipmentAssistant.AssistantID]);
 
             await connection.promise().query(`
-                INSERT INTO truckschedule (TruckID, DriverID, AssistantID, ShipmentID, ScheduleDateTime, StoreID, Hours,
-                                           Status, RouteID)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'Not Completed', ?)
+                INSERT INTO truckschedule (TruckID, DriverID, AssistantID,ScheduleDateTime, ShipmentID,
+                                           Status)
+                VALUES (?, ?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 2 HOUR ), ?,'Not Completed')
             `, [
                 truckID,
                 shipmentDriver.DriverID,
                 shipmentAssistant.AssistantID,
                 shipment.ShipmentID,
-                new Date(Date.now() + 12 * 60 * 60 * 1000)
-                    .toISOString()
-                    .slice(0, 19)
-                    .replace('T', ' '),  // ScheduleDateTime in UTC
                 shipment.StoreID,
                 secondsToTime(routeDuration),  // Hours in HH:MM:SS format
                 RouteID
@@ -218,7 +193,7 @@ cron.schedule('* * * * *', async () => {
                 WHERE sh.ShipmentID = ?
             `, [shipment.ShipmentID]);
 
-            console.log(`Driver ${shipmentDriver.DriverID} and assistant ${shipmentAssistant.AssistantID} assigned to truck ${truckID} to deliver shipment ${shipment.ShipmentID}.`);
+            console.log(`Driver ${shipmentDriver.DriverID.toString()} and assistant ${shipmentAssistant.AssistantID.toString()} assigned to truck ${truckID} to deliver shipment ${shipment.ShipmentID}.`);
         }
 
         // Commit the transaction
@@ -228,8 +203,6 @@ cron.schedule('* * * * *', async () => {
         // Rollback the transaction in case of error
         await connection.promise().query('ROLLBACK');
         console.error("Error executing truck scheduling task:", error);
-    } finally {
-        connection.end();
     }
 });
 

@@ -20,21 +20,29 @@ connection.connect((err) => {
     }
 });
 
-const futureDate = new Date(Date.now() + 12 * 60 * 60 * 1000)
+const futureDate = new Date(Date.now())
     .toISOString()
-    .slice(0, 19)
-    .replace('T', ' ');
 
-console.log("10 hours from now:", futureDate);
+
+console.log(`Current date: ${futureDate}`);
 
 const query = `
-    UPDATE truckschedule SET ScheduleDateTime = ? WHERE TruckScheduleID = 11;
+    UPDATE truckschedule
+    SET ScheduleDateTime = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 2 HOUR )
+    WHERE TruckScheduleID = 11;
 `;
 
-connection.query(query, [futureDate], (err, results) => {
-    if (err) {
-        console.error('Error updating schedule:', err.stack);
-        return;
-    }
-    console.log('Schedule updated successfully');
-});
+
+try {
+    connection.query(query, [futureDate], (err, results) => {
+        if (err) {
+            console.error('Error updating schedule:', err.stack);
+            return;
+        }
+        console.log('Schedule updated successfully');
+    });
+} catch (e) {
+    console.error('Error updating schedule:', e.stack);
+} finally {
+    connection.end();
+}

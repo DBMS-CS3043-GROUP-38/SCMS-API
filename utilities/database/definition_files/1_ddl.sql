@@ -15,9 +15,9 @@ CREATE TABLE `Employee`
 (
     `EmployeeID`   INT AUTO_INCREMENT,
     `Name`         VARCHAR(100)                                          NOT NULL,
-    `Username`     VARCHAR(50)                                           NOT NULL,
+    `Username`     VARCHAR(50)                                           NOT NULL unique,
     `Address`      VARCHAR(100),
-    `Contact`      VARCHAR(15),
+    `Contact`      VARCHAR(15)                                           not null,
     `PasswordHash` VARCHAR(200)                                          NOT NULL,
     `Type`         ENUM ('Admin', 'StoreManager', 'Driver', 'Assistant') NOT NULL,
     `StoreID`      INT,
@@ -80,14 +80,6 @@ CREATE TABLE `TrainSchedule`
     FOREIGN KEY (`TrainID`) REFERENCES `Train` (`TrainID`)
 );
 
-create table `Train_Contains`
-(
-    `TrainScheduleID` INT,
-    `OrderID`         INT,
-    PRIMARY KEY (`TrainScheduleID`, `OrderID`),
-    FOREIGN KEY (`TrainScheduleID`) REFERENCES `TrainSchedule` (`TrainScheduleID`)
-);
-
 
 CREATE TABLE `Truck`
 (
@@ -119,10 +111,10 @@ CREATE TABLE `Order_status`
 CREATE TABLE `Customer`
 (
     `CustomerID`   INT AUTO_INCREMENT,
-    `Username`     VARCHAR(50),
+    `Username`     VARCHAR(50)              not null UNIQUE,
     `Name`         VARCHAR(100)             NOT NULL,
     `Address`      VARCHAR(100),
-    `Contact`      VARCHAR(15),
+    `Contact`      VARCHAR(15)              not null,
     `Type`         ENUM ('End', 'Retailer') NOT NULL,
     `City`         VARCHAR(50),
     `PasswordHash` VARCHAR(200),
@@ -141,6 +133,16 @@ CREATE TABLE `Order`
     PRIMARY KEY (`OrderID`),
     FOREIGN KEY (`CustomerID`) REFERENCES `Customer` (`CustomerID`),
     FOREIGN KEY (`RouteID`) REFERENCES `Route` (`RouteID`)
+);
+
+
+create table `Train_Contains`
+(
+    `TrainScheduleID` INT,
+    `OrderID`         INT,
+    PRIMARY KEY (`TrainScheduleID`, `OrderID`),
+    FOREIGN KEY (`OrderID`) REFERENCES `Order` (`OrderID`),
+    FOREIGN KEY (`TrainScheduleID`) REFERENCES `TrainSchedule` (`TrainScheduleID`)
 );
 
 create table `Contains`
@@ -171,25 +173,21 @@ create table `Shipment_contains`
     `ShipmentID` INT NOT NULL,
     `OrderID`    INT NOT NULL,
     PRIMARY KEY (`ShipmentID`, `OrderID`),
-    FOREIGN KEY (`ShipmentID`) REFERENCES `Shipment` (`ShipmentID`)
+    FOREIGN KEY (`ShipmentID`) REFERENCES `Shipment` (`ShipmentID`),
+    FOREIGN KEY (`OrderID`) REFERENCES `Order` (`OrderID`)
 );
 
 
 CREATE TABLE `TruckSchedule`
 (
     `TruckScheduleID`  INT AUTO_INCREMENT,
-    `StoreID`          INT       NOT NULL,
     `ShipmentID`       INT       NOT NULL,
     `ScheduleDateTime` TIMESTAMP NOT NULL,
-    `RouteID`          INT       NOT NULL,
     `AssistantID`      INT       NOT NULL,
     `DriverID`         INT       NOT NULL,
     `TruckID`          INT       NOT NULL,
-    `Hours`            TIME,
     `Status`           ENUM ('Not Completed', 'In Progress', 'Completed'),
     PRIMARY KEY (`TruckScheduleID`),
-    FOREIGN KEY (`StoreID`) REFERENCES Store (`StoreID`),
-    FOREIGN KEY (`RouteID`) REFERENCES `Route` (`RouteID`),
     FOREIGN KEY (`DriverID`) REFERENCES `Driver` (`DriverID`),
     FOREIGN KEY (`TruckID`) REFERENCES `Truck` (`TruckID`),
     FOREIGN KEY (`AssistantID`) REFERENCES `Assistant` (`AssistantID`),

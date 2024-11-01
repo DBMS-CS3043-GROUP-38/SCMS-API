@@ -58,7 +58,7 @@ END//
 
 CREATE PROCEDURE GetCustomerReport(IN customerId INT)
 BEGIN
-    SELECT * FROM customer_report c WHERE c.CustomerID = customerId;
+    SELECT * FROM customer_profile c WHERE c.CustomerID = customerId;
 END //
 
 
