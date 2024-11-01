@@ -189,7 +189,7 @@ cron.schedule('* * * * *', async () => {
                 WHERE sh.ShipmentID = ?
             `, [shipment.ShipmentID]);
 
-            console.log(`Driver ${shipmentDriver.DriverID} and assistant ${shipmentAssistant.AssistantID} assigned to truck ${truckID} to deliver shipment ${shipment.ShipmentID}.`);
+            console.log(`Driver ${shipmentDriver.DriverID.toString()} and assistant ${shipmentAssistant.AssistantID.toString()} assigned to truck ${truckID} to deliver shipment ${shipment.ShipmentID}.`);
         }
 
         // Commit the transaction
