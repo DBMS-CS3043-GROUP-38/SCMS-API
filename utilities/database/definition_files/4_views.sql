@@ -88,7 +88,7 @@ FROM `Order` o
 
 create view shipment_progress as
 SELECT sc.ShipmentID,
-       COUNT(sc.OrderID) AS TotalOrders,
+       COUNT(sc.OrderID)                             AS TotalOrders,
        SUM(IF(ods.LatestStatus = 'Delivered', 1, 0)) AS Delivered
 FROM shipment_contains sc
          JOIN order_details_with_latest_status ods ON sc.OrderID = ods.OrderID
@@ -101,16 +101,17 @@ SELECT ts.TruckScheduleID,
        s.StoreID,
        ts.ShipmentID,
        ts.ScheduleDateTime,
-       DATE_ADD(ts.ScheduleDateTime, INTERVAL TIME_TO_SEC(r.Time_duration) SECOND) AS EndTime,  -- Calculating EndTime
+       DATE_ADD(ts.ScheduleDateTime, INTERVAL TIME_TO_SEC(r.Time_duration) SECOND) AS EndTime, -- Calculating EndTime
        shipment_progress.RouteID,
        ts.AssistantID,
        ts.DriverID,
        ts.TruckID,
-       r.Time_duration as Hours,
+       r.Time_duration                                                             as Hours,
+       r.Distance,
        ts.Status,
-       s.City AS StoreCity,
-       a.Name AS AssistantName,
-       d.Name AS DriverName,
+       s.City                                                                      AS StoreCity,
+       a.Name                                                                      AS AssistantName,
+       d.Name                                                                      AS DriverName,
        t.LicencePlate,
        shipment_progress.TotalOrders,
        shipment_progress.Delivered
@@ -118,9 +119,10 @@ FROM truckschedule ts
          JOIN truck t ON ts.TruckID = t.TruckID
          JOIN driver_details_with_employee d ON ts.DriverID = d.DriverID
          JOIN assistant_details_with_employee a ON ts.AssistantID = a.AssistantID
-         JOIN (
-             select s.ShipmentID,s.RouteID, p.TotalOrders, p.Delivered from shipment_progress p join shipment s on p.ShipmentID = s.ShipmentID
-    ) AS shipment_progress ON ts.ShipmentID = shipment_progress.ShipmentID
+         JOIN (select s.ShipmentID, s.RouteID, p.TotalOrders, p.Delivered
+               from shipment_progress p
+                        join shipment s on p.ShipmentID = s.ShipmentID) AS shipment_progress
+              ON ts.ShipmentID = shipment_progress.ShipmentID
          JOIN route r ON shipment_progress.RouteID = r.RouteID
          JOIN store s ON r.StoreID = s.StoreID
 ORDER BY EndTime DESC;
@@ -229,15 +231,13 @@ ORDER BY SaleDate DESC, TotalRevenue DESC
 //
 
 
-CREATE VIEW Truck_Distances AS
-SELECT ts.TruckID,
-       SUM(r.Distance) AS TotalDistance
-FROM TruckSchedule ts
-    join shipment on ts.ShipmentID = shipment.ShipmentID
-         JOIN Route r ON shipment.RouteID = r.RouteID
-WHERE ts.Status = 'Completed'
-GROUP BY ts.TruckID;
+create view Truck_Distances as
+select t.TruckID, COALESCE(SUM(ts.Distance), 0) as TotalDistance
+from truck t
+         left outer join truck_schedule_with_details ts on t.TruckID = ts.TruckID and ts.Status = 'Completed'
+group by t.TruckID;
 //
+
 
 
 -- Shakthi - View for Driver and Assistant login
@@ -289,7 +289,6 @@ WHERE a.Status = 'Available'
 ORDER BY a.CompletedHours
 ;
 //
-
 
 
 DELIMITER ;
