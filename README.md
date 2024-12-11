@@ -52,6 +52,12 @@ The **Supply Chain Management API** serves as the backbone of the platform, hand
    ```bash
    npm start
    ```
+6. **Run the Truck Scheduler Daemon**:
+
+   - To run the truck scheduler daemon process, execute:
+     ```bash
+     npm run truck-scheduler
+     ```
 
 ---
 
@@ -86,6 +92,10 @@ The **Supply Chain Management API** serves as the backbone of the platform, hand
   - Simulates orders for testing system features.
 - **Truck Scheduler**:
   - Manages driver and assistant assignments for shipments.
+- **API Endpoints**:
+  - Provides endpoints for all system components.
+- **JWT Authentication**:
+  - Secures API endpoints using JWT tokens.
 
 ---
 
